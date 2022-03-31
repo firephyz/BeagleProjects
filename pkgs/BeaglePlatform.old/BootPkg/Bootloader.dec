@@ -1,0 +1,11 @@
+[Defines]
+  PACKAGE_NAME      = BootloaderPkg
+  PACKAGE_GUID      = 1E73767F-8F52-4603-AEB4-F29B510B6766
+  PACKAGE_VERSION   = 0.1
+
+  DEC_SPECIFICATION = 0x0001001B
+
+[PcdsFixedAtBuild]
+  gArmBootloader.cBootloaderBase|0x0|UINT32|0x00000000
+  gArmBootloader.cBootloaderSize|0x0|UINT32|0x00000001
+  gArmBootloader.FvBootloader|0x0|UINT32|0x00000002

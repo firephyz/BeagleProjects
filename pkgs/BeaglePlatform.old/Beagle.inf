@@ -1,0 +1,11 @@
+[Defines]
+  BASE_NAME           = Beagle
+  VERSION_STRING      = 0.1
+  MODULE_TYPE         = BASE # BASE SEC PEI_CORE PEIM
+  FILE_GUID           = B07D35B0-F0ED-2693-137D-925E2E76BAFE
+  # LIBRARY_CLASS       = SEC
+
+  INF_VERSION         = 0x00010005
+
+[Packages]
+  BeaglePlatform/Beagle.dec

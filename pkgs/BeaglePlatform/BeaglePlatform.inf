@@ -1,0 +1,14 @@
+# [Defines]
+#   BASE_NAME           = BlackHeader
+#   MODULE_TYPE         = BASE
+#   VERSION_STRING      = 0.1
+#   FILE_GUID           = B07D35B0-F0ED-2693-137D-925E2E76BAFE
+
+#   INF_VERSION         = 0x0001001B
+
+# [Packages]
+#   BlackPlatform/BlackPlatform.dec
+
+# [FixedPcd]
+#   gBeaglePlatform.FdImageBaseAddr
+#   gBeaglePlatform.FdImageSize

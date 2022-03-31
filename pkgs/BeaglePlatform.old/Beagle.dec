@@ -1,0 +1,10 @@
+[Defines]
+  PACKAGE_NAME      = BeaglePkg
+  PACKAGE_GUID      = 1F2EC017-79E6-4CE2-46F5-C946A4B8E56F
+  PACKAGE_VERSION   = 0.1
+
+  DEC_SPECIFICATION = 0x0001001B
+
+[PcdsFixedAtBuild]
+  gBeaglePlatform.FdImageBaseAddr|0x0|UINT64|0x00000000
+  gBeaglePlatform.FdImageSize|0x0|UINT64|0x00000001

@@ -1,0 +1,80 @@
+[Defines]
+   INF_VERSION = 0x0001001B
+   BASE_NAME = Bootloader
+   # LIBRARY_CLASS = Bootloader | SEC
+   FILE_GUID = 3B6018C4-13E2-23AF-6704-38D7C2A5F8B4
+   VERSION_STRING = 0.1
+   MODULE_TYPE = SEC
+
+#   {LIBRARY_CLASS = {<SimpleWord> {|<! !<ModuleType>>}^} {NULL}}*
+#   {ENTRY_POINT = <CName> {|<Expression>}^}*
+
+[Sources]
+  arm/entry.S
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses.SEC]
+  PrePeiUniCore
+
+ # [Binaries]
+ #   TE|ARM/BlackPlatform/Bootloader/Bootloader/OUTPUT/arm/entry.obj
+#   PE32|DEBUG/PrePeiUniCore.efi|DEBUG
+#   PE32|RELEASE/PrePeiUniCore.efi|RELEASE
+
+################################################################################
+# Binaries
+################################################################################
+# Specifies binary files that are to be distributed with a binary module (only
+#   applies to binary modules).
+# Products are used after the build to supplement Application, FD or FV creation.
+# Only one EFI_SECTION_VERSION allowed in an FFS image (one VER or UNI_VER type).
+#   Also, only one EFI_SECTION_USER_INTERFACE (given with UI or UNI_UI types) and
+#   only one EFI_SECTION_FREEFORM_SUBTYPE_GUID (given with SUBTYPE_GUID) per FFS.
+#
+# Binary File Types:
+#   GUID         - This binary is an EFI_SECTION_GUID_DEFINED encapsulation section. The EDK II build system does not support binary files of this type.
+#   ACPI         - The binary is ACPI binary code generated from an ACPI compiler. There is not PI defined type for this file, it uses an EFI_SECTION_RAW leaf section.
+#   ASL          - The binary is an ACPI Table generated from an ACPI compiler. There is no PI defined type for this file, it uses an EFI_SECTION_RAW leaf section.
+#   DISPOSABLE   - Unlike other file types listed in this section, the file will not be placed in a leaf section of type EFI_SECTION_DISPOSABLE , but rather it is a binary file that will be ignored by the build tools. (Useful for distributing PDB files with binary modules.)
+#   UEFI_APP     - The binary file is a PE32 UEFI Application which will be placed into an FFS file of type EFI_FV_FILETYPE_APPLICATION.
+#   PE32         - This binary is an EFI_SECTION_PE32 leaf section.
+#   PIC          - This binary is an EFI_SECTION_PIC leaf section.
+#   PEI_DEPEX    - This binary is an EFI_SECTION_PEI_DEPEX leaf section.
+#   DXE_DEPEX    - This binary is an EFI_SECTION_DXE_DEPEX leaf section.
+#   SMM_DEPEX    - This binary is an EFI_SECTION_SMM_DEPEX leaf section.
+#   SUBTYPE_GUID - This binary is an EFI_SECTION_FREEFORM_SUBTYPE_GUID leaf section.
+#   TE           - This binary is an EFI_SECTION_TE leaf section.
+#   UNI_VER      - This is a Unicode file that needs to be used to create an EFI_SECTION_VERSION leaf section.
+#   VER          - This binary is an EFI_SECTION_VERSION leaf section.
+#   UNI_UI       - This is a Unicode file that needs to be used to create an EFI_SECTION_USER_INTERFACE leaf section.
+#   UI           - This binary is an EFI_SECTION_USER_INTERFACE leaf section.
+#   BIN          - This binary is an EFI_SECTION_RAW leaf section.
+#   RAW          - This binary is an EFI_FV_FILETYPE_RAW leaf section.
+#   COMPAT16     - This binary is an EFI_SECTION_COMPATIBILTY16 leaf section.
+#   FV           - This binary is an EFI_SECTION_FIRMWARE_VOLUME_IMAGE leaf section.
+#   LIB          - This binary is a pre-built library instance that provides the library class defined in the LIBRARY_CLASS statement in the [Defines] section
+# 
+# {[Binaries} {[Binaries.common]} {[<!,!Binaries.<arch>>]}
+#   {{{{{{UNI_UI} {UI}}|<Filename>}
+#      {{UNI_VER} {VER}}|<Filename>}}
+#     {|{[<Target>]}
+#       {[<Target>]|<FeatureFlagExpress>}}^
+#    }
+#    {{<MacroDefinition>}
+#     {{{<FileType>|<Filename>}
+#       {SUBTYPE_GUID|{{<CName-or-RegistryFormatGUID>}}|<Filename>}}
+#      {|{[<Target>]}
+#        {[<Target>]|[<Family>]}
+#        {[<Target>]|[<Family>]|[<TagName>]}
+#        {[<Target>]|[<Family>]|[<TagName>]|<FeatureFlagExpress>}}^
+#     }
+#    }*
+#   }
+# 
+# <Target> ::= {<ToolWord>} {<Wildcard>}
+# <Family> ::= {"MSFT"} {"GCC"} {"INTEL"} {<Usr-ToolWord>} {<Wildcard>}
+# <TagName> ::= {ToolWord} {<Wildcard>}
+# <FeatureFlagExpress> ::= <Boolean>
+# <FileType> ::= {"ACPI"} {"ASL"} {"PE32"} {"PIC"} {"FV"} {"PEI_DEPEX"} {"DXE_DEPEX"} {"SMM_DEPEX"} {"TE"} {"BIN"} {"RAW"} {"COMPAT16"} {"DISPOSABLE"} {"LIB"}

@@ -1,0 +1,17 @@
+[Defines]
+  PACKAGE_NAME = BootloaderPkg
+  PACKAGE_GUID = AA80CAA2-61F6-4DC4-A0DC-2EA4B194CADC
+  PACKAGE_VERSION = 0.1
+
+  DEC_SPECIFICATION = 0x0001001B
+
+[PcdsFixedAtBuild]
+  gBootloaderTSG.cFvBaseAddress|0x0|UINT32|0x00000000
+  gBootloaderTSG.cFvSize|0x0|UINT32|0x00000001
+  gBootloaderTSG.cFvPeiBaseAddress|0x0|UINT32|0x00000002
+  gBootloaderTSG.cFvPeiSize|0x0|UINT32|0x00000003
+  # gBootloaderTSG.cBootloaderMagic|0x5|UINT64|0x00000002
+
+[Guids]
+  gBootloaderTSG = {0x435B5601, 0x6983, 0xBF0C, {0x1B, 0xDE, 0xC5, 0x70, 0x71, 0xC6, 0xFA, 0xC6}}
+  # gBeagleBootloaderMagic   = {0xF76EDB4A, 0x23EF, 0xDB07, {0x67, 0x30, 0x8D, 0x42, 0x32, 0x94, 0xE9, 0x2F}}

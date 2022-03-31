@@ -1,0 +1,42 @@
+[FD.BeagleBoneBlack]
+  DEFINE MMC_IMAGE_BASE     = 0x00000000
+  DEFINE MMC_IMAGE_SIZE     = 0x00030000
+
+  BaseAddress        = $(MMC_IMAGE_BASE) | gBeaglePlatform.FdImageBaseAddr
+  Size               = $(MMC_IMAGE_SIZE) | gBeaglePlatform.FdImageSize
+  ErasePolarity      = 1
+  BlockSize          = 0x100
+  NumBlocks          = 0x300
+
+  $(MMC_IMAGE_BASE)|$(MMC_IMAGE_SIZE)
+  # gBeaglePlatform.cBootloaderBase|gBeaglePlatform.cBootloaderSize
+  FV = SecBootloader
+
+[FV.SecBootloader]
+  FvAlignment = 1
+  # FileSystemGuid = gFvSecBootloader
+  FvNameGuid = gFvSecBootloader
+  FvUsedSizeEnable = True
+  FvNameString = True
+
+  # FILE RAW = gFfsSecJump {
+  #   $(OUTPUT_DIRECTORY)/$(TARGET)_$(TOOL_CHAIN_TAG)/ARM/ArmPlatformPrePeiCore.efi
+  # }
+
+  FILE RAW = gFfsSecBootloaderVersion {
+    SECTION VERSION = "0.1"
+  }
+
+  # FILE SEC = gFfsPrePeiCore USE = ARM RELOCS_STRIPPED {
+  FILE SEC = gFfsPrePeiCore RELOCS_STRIPPED {
+    SECTION PE32 = $(OUTPUT_DIRECTORY)/$(TARGET)_$(TOOL_CHAIN_TAG)/ARM/ArmPlatformPrePeiCore.efi
+  }
+
+  # TODO: Add 'RELOCS_STRIPPED' attribute at the end of static SEC or PEI modules.
+  # May not be needed
+  # INF BlackPlatform/BlackPlatform.inf
+  # INF BlackPlatform/Bootloader/Bootloader.inf
+  # RELOCS_STRIPPED
+  # FILE FV_IMAGE = BAFBCEC8-8673-DF5B-DA6B-F74BD9544EB0 FIXED {
+  #   FV = Beagle
+  # }

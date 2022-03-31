@@ -1,0 +1,30 @@
+Imagine an object needs some data A to accomplish a member function. It could hold a personal copy of A (which
+  may not always be necessary), or it could pass A in to the function as it needs it. You could also have a
+  language construct that conveys the notion of a <temporarily given thing by some prescribed method> that comes
+  along with the object (declared as part of the object?).
+
+
+
+
+
+mcr coproc <- core-reg
+mrc core-reg <- coproc
+
+c1, c0, 0, 0: SCTLR - system control register
+
+dsb
+isb
+
+29610
+
+Booting
+  MMC:
+    mmc0 is SD card
+    mmc1 is eMMC
+  S1 : warm reset
+  S2 : Pushing S2 toggles the 3rd bit to a zero
+    0 : sysboot(403c) : pushed     boot_order(SPI, MMC0, USB, UART)
+    1 : sysboot(4038) : not pushed boot_order(MMC1, MMC0, UART, USB)
+  S3 : Reset PMU
+  
+  Sysboot is latched on a cold reset (saved across warm resets)

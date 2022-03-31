@@ -1,0 +1,17 @@
+[Defines]
+  INF_VERSION = 0x0001001B
+  BASE_NAME = ArmPlatformLib
+  FILE_GUID = B7E69E86-8DE7-3EB0-519E-DD3AB93B0E34
+  VERSION_STRING = "0.1"
+  MODULE_TYPE = BASE
+  LIBRARY_CLASS = ArmPlatformLib | SEC PEI_CORE PEIM DXE_CORE DXE_DRIVER
+
+[Packages]
+  
+
+[FixedPcd]
+  gArmTokenSpaceGuid.PcdArmPrimaryCoreMask
+  gArmTokenSpaceGuid.PcdArmPrimaryCore
+
+[Ppis]
+  gArmMpCoreInfoPpiGuid

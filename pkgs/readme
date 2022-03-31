@@ -1,0 +1,60 @@
+boot Shell on beagle
+  boot PEI on beagle
+  boot shell on qemu
+    boot dxe
+      boot pei
+      boot prepei
+        generate fd file
+	  read about creating efi images
+	    | https://tianocore-docs.github.io/edk2-BuildSpecification/release-1.28/2_design_discussion/26_creating_efi_images.html#26-creating-efi-images
+
+Build Process
+   TOOL_CHAIN_CONF
+      Points to the tools_def.txt and sets Makefile macros to describe tooling.
+      DSC and INF files may override or append to these tool chain definitions.
+   Obtain DSC Platform description file
+      DSC functionalities
+         Maps libraries to INF module files
+         Lists required module INF files (components?)
+         Sets platform level PCD variables
+         Flash iamge file
+            Sets file in platform DSC
+            parse to obtain FDF PCD values
+         Set platform specific build options
+      DSC Source File Build Options
+         BUILD_RULE_CONF.txt defines rules to build each source file depending on the file extension.
+      include! directives
+         bnf: <path> | $(WORKSPACE)/<path>
+   Parse INF and DEC files for each dependency
+      INF Files declare the module
+         sources, libs, packages, GUID/protocol/ppi list, PCDs
+	 [Packages] section
+	    links to includes of each listed package
+	       each packages' DEC file's [Includes] section is parsed for this purpose
+	 MODULE_TYPE lists the type of EDK component we are building
+      DEC Files
+         list include paths and set GUID and PCD values
+
+
+FDF Files
+  FD Section
+  FV Section
+    ExtentedFvEntry ?
+    FvStatements
+      block def statements (size and count)
+      attributes
+        one of MEMORY_MAPPED|LOCK_CAP|LOCK_STATUS|WRITE_LOCK_CAP|WRITE_LOCK_STATUS|WRITE_ENABLED_CAP|WRITE_DISABLED_CAP|WRITE_STATUS|STICKY_WRITE|WRITE_POLICY_RELIABLE|READ_LOCK_CAP|READ_LOCK_STATUS|READ_ENABLED_CAP|READ_DISABLED_CAP|READ_STATUS|ERASE_POLARITY
+	All true or false except ERASE_POLARITY (its 0 or 1)
+      FvAlignment = <FvAlignmentValues>
+        FvBaseAddress = <base_addr>
+        FvForceRebase = <TrueFalse>
+      FileSystemGuid = <NamedGuid>
+      FvNameGuid = <NamedGuid>
+      FvUsedSizeEnable = <TrueFalse>
+      FvNameString = <NameString>
+      <(Pei|Dxe)AprioriSection>
+      InfFiles
+        INF <InfOptions> <path> (early module? optional add <RelocFlags>)
+      FileStatements (see documentation)
+        image file 
+    GlobalStmts - macro defs or !includes

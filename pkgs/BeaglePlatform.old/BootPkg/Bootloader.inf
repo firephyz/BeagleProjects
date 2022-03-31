@@ -1,0 +1,11 @@
+[Defines]
+  BASE_NAME           = Bootloader
+  VERSION_STRING      = 0.1
+  MODULE_TYPE         = SEC # BASE SEC PEI_CORE PEIM
+  FILE_GUID           = 2461DEE9-14AB-1480-AC21-C247EB15B53A
+  # LIBRARY_CLASS       = SEC
+
+  INF_VERSION         = 0x00010005
+
+[LibraryClasses.SEC]
+  PrePeiCoreUniCore

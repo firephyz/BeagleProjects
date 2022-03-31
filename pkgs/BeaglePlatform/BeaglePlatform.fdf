@@ -1,0 +1,79 @@
+[Defines]
+  DEFINE BUILD_OUTPUT = $(OUTPUT_DIRECTORY)/$(TARGET)_$(TOOL_CHAIN_TAG)/$(ARCH)
+
+  DEFINE BOOTLOADER_IMAGE_RESERVE_SIZE = 0x4000
+  DEFINE PEI_CORE_RESERVE_BASE         = $(BOOTLOADER_IMAGE_RESERVE_SIZE)
+  DEFINE PEI_CORE_RESERVE_SIZE         = 0x30000
+
+[FD.BeagleBoot]
+  BaseAddress        = $(MMC_IMAGE_BASE) | gBeaglePlatformTSG.FdImageBaseAddr
+  Size               = $(MMC_IMAGE_SIZE) | gBeaglePlatformTSG.FdImageSize
+  ErasePolarity      = 1
+  BlockSize          = 0x100
+  NumBlocks          = 0x1000
+
+  # SET gBootloaderTSG.cTempStackBase = 
+  # SET gBootloaderTSG.cTempStackSize = $(MMC_TEMP_STACK_SIZE)
+
+  # 0x0|0x100
+  # FILE = $(BUILD_OUTPUT)/jump.bin
+
+  0x0|$(BOOTLOADER_IMAGE_RESERVE_SIZE)
+  gBootloaderTSG.cFvBaseAddress|gBootloaderTSG.cFvSize
+  FV = Bootloader
+
+  $(PEI_CORE_RESERVE_BASE)|$(PEI_CORE_RESERVE_SIZE)
+  gBootloaderTSG.cFvPeiBaseAddress|gBootloaderTSG.cFvPeiSize
+  FV = PeiCore
+
+  # 0x30000|0x30000
+  # # gBeaglePlatform.cBootloaderBase|gBeaglePlatform.cBootloaderSize
+  # FV = DxeCore
+
+[FV.Bootloader]
+  # FV_EXT_ENTRY_TYPE TYPE = 0x0003 {
+  #   DATA = {0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5}
+  # }
+  # FileSystemGuid = gFdFileSystemGuid
+  FvAlignment = 1
+  # FileSystemGuid = DFD664FA-E621-1106-E94B-E91E73C76F56
+  # FvNameGuid = CB9DBE18-7093-ADA6-47F2-D7E65625439C
+  # FvUsedSizeEnable = True
+  # FvNameString = True
+
+  # FILE RAW = gFfsPeiCoreVersion {
+  #   SECTION VERSION = "0.1"
+  # }
+
+  FILE SEC = gFfsBootloader {
+    SECTION Align=128 PE32 = $(BUILD_OUTPUT)/Bootloader.efi
+  }
+
+[FV.PeiCore]
+  FvAlignment = 1
+
+  SET gArmTokenSpaceGuid.PcdFdBaseAddress = gBeaglePlatformTSG.FdImageBaseAddr
+  SET gArmTokenSpaceGuid.PcdFdSize = gBeaglePlatformTSG.FdImageSize
+
+  FILE RAW = gFfsVersionPeiCore {
+    SECTION VERSION = "0.1"
+  }
+
+  FILE PEI_CORE = gFfsImagePeiCore {
+    SECTION PE32 = $(BUILD_OUTPUT)/PeiCore.efi
+  }
+
+  # FILE PEIM = gFfsPeimMemoryInit {
+  #   SECTION Align = 32 PE32 RELOCS_STRIPPED = $(BUILD_OUTPUT)/MemoryInit.efi
+  # }
+
+[FV.DxeCore]
+  FvAlignment = 1
+
+  FILE RAW = gFfsVersionDxeCore {
+    SECTION VERSION = "0.1"
+  }
+
+  FILE DXE_CORE = gFfsImageDxeCore {
+    SECTION PE32 = $(BUILD_OUTPUT)/DxeCore.efi
+  }

@@ -1,0 +1,16 @@
+Automatic special variables:
+  Variants
+    $@ - target full name
+    $% - if rule == <archive>(<member-file>), then this is <member-file>
+    $< - name of the first prereq. Note that implicit rules might append prereqs that will be returned first instead.
+    $? - names of all prereqs newer than target
+    $^ - names of all prereqs
+    $+ - same as '$^' but with duplicate prereqs included instead of filtered out like normal
+    $| - all order-only prereqs
+    $* - stem of the target wildcard match (use of '%')
+  Usage Modifiers
+    Special variables of the form '$'<char> (like above) can be modified with (D|F) like this: '$('<char>(D|F)')'. This
+      can be used to fetch the 'directory part' or 'file-name part' of the original normal special variable.
+      - '$(@D)' for example, will return the 'D'irectory part of the $@ variable with the trailing slash removed.
+      
+
