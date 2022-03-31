@@ -15,7 +15,7 @@
   DEFINE MMC_TEMP_STACK_SIZE = 0x10000
 
 [BuildOptions]
-  GCC:*_*_*_CC_FLAGS = -mcpu=cortex-a8 -mfloat-abi=soft
+  GCC:*_*_*_CC_FLAGS = -mcpu=cortex-a8 -mfloat-abi=soft -lgcc
   GCC:*_*_*_ASM_FLAGS = -mcpu=cortex-a8 -mthumb
   #  -lgcc -lc
 

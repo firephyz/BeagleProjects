@@ -25,6 +25,12 @@ targets_of_aliases = ['DxeCoreMemoryAllocationLib',
                       'DxeCoreHobLib',
                       'DxeMain',
                       'DxeCoreEntryPoint']
+# targets_of_aliases = ['PeiMemoryAllocationLib',
+#                       'PeiHobLib',
+#                       'PeiMain',
+#                       'PeiCoreEntryPoint']
+target_efi = 'DxeCore.efi'
+#target_efi = 'PeiCore.efi'
 
 
 
@@ -94,7 +100,7 @@ for i,line in enumerate(map_file):
         if len(sec_name) == 0:
             sec_name = subsec
             subsec = ''
-        # Handle rodata string special case
+        # Handle rodata lto string special case
         if subsec == 'rodata':
             if re.match('(.*?)\.str[0-9a-z]+\..*', sec_name):
                 sec_name = re.findall('(.*?)\.str[0-9a-z]+\..*', sec_name)[0]
@@ -103,6 +109,12 @@ for i,line in enumerate(map_file):
                        'section_type': subsec,
                        'name': match[0],
                        'misc': misc_data}
+        # Handle other lto special cases
+        if re.match('(.*)\.(constprop|isra)', sec_name):
+            tmp = sec_name
+            sec_name = re.findall('(.*)\.(constprop|isra).*', sec_name)[0][0]
+            map_file[i]['section'] = sec_name
+            print('{:<40} -> {}'.format(tmp, sec_name))
         sections += [line]
     elif re.match(script_re, line):
         match = re.findall(script_re, line)[0]
@@ -168,15 +180,23 @@ map_file = list(filter(lambda x: x != [], map_file))
 
 
 # Get list of obj sections
-get_section_cmd = 'for f in $(find edk2/Build/BeagleBone/DEBUG_GCC5/ARM/ -regex \'.*obj$\'); do echo $f; /home/builder/rpmbuild/BUILDROOT/root/bin/arm-none-eabi-objdump -D $f | grep section | grep -vE "debug_(info|abbrev|line|str)|\\.lto_(__FUNCTION_|\\.(inline|jmpfuncs|lto|symbol_nodes|refs|decls|symtab|ext_symtab|opts))|\\.comment|\\.ARM\\.attributes" | sed -r \'s/^/  /\'; done'
+#get_section_cmd = 'for f in $(find edk2/Build/BeagleBone/DEBUG_GCC5/ARM/ -regex \'.*obj$\'); do echo $f; /home/builder/rpmbuild/BUILDROOT/root/bin/arm-none-eabi-objdump -D $f | grep section | grep -vE "debug_(info|abbrev|line|str)|\\.lto_(__FUNCTION_|\\.(inline|jmpfuncs|lto|symbol_nodes|refs|decls|symtab|ext_symtab|opts))|\\.comment|\\.ARM\\.attributes" | sed -r \'s/^/  /\'; done'
+get_section_cmd = 'for f in $(find edk2/Build/BeagleBone/DEBUG_GCC5/ARM/ -regex \'.*obj$\'); do echo $f; /home/builder/rpmbuild/BUILDROOT/root/bin/arm-none-eabi-objdump -D $f | grep section | grep -vE "debug_(info|abbrev|line|str)|\\.comment|\\.ARM\\.attributes" | sed -r \'s/^/  /\'; done'
 obj_section_text = subprocess.check_output(get_section_cmd, shell=True, text=True)
 obj_sections = re.split('edk2/Build/BeagleBone/DEBUG_GCC5/ARM/', obj_section_text)
 obj_sections = list(filter(lambda x: len(x) != 0, obj_sections))
 
+#section_symbol_re_lto = '\.gnu\.lto_(?!(\.|__FUNCTION__))((.(?!part\.[0-9]+))+?)\.(?!part\.[0-9]+)[0-9]+\.[0-9a-z]+'
+section_symbol_re_lto = '\.gnu\.lto_(?!(\.|__FUNCTION__))((.)+?)\.[0-9]+\.[0-9a-z]+'
+section_symbol_re_general = '\.(?!gnu\.lto_)([^:]+)'
+section_symbol_re = '.*of section ({}|{}):'.format(section_symbol_re_lto, section_symbol_re_general)
 for i,sec in enumerate(obj_sections):
     lines = list(filter(lambda x: not re.match('^[ ]*$', x), re.split('\n', sec)))
     module, obj_name = re.findall('([^/]+)/OUTPUT/(.*)', lines[0])[0]
-    symbols = list(map(lambda x: ''.join(re.findall('.*of section (\.gnu\.lto_(.*?)\.[0-9a-z]+\.[0-9a-z]+|\.([^:]*)):', x)[0][1:]), lines[1:])) if len(lines) > 1 else []
+    symbols = list(map(lambda match: ''.join([match[0][2], match[0][4]]),
+                       filter(lambda match: match != [],
+                              map(lambda x: re.findall(section_symbol_re, x),
+                                  lines[1:]))))
     obj_sections[i] = {'path': lines[0],
                        'module': module,
                        'obj': obj_name,
@@ -206,7 +226,7 @@ for i,efi_debug in enumerate(efi_debug_syms):
                          'module': module,
                          'obj': None,
                          'symbols': lines[1:]}
-efi_debug_syms = list(filter(lambda x: x['module'] == 'DxeCore.efi', efi_debug_syms))
+efi_debug_syms = list(filter(lambda x: x['module'] == target_efi, efi_debug_syms))
 
 
 
@@ -215,6 +235,7 @@ module_sizes = {}
 module_matches = {}
 multiple_matches = []
 no_matches = []
+efi_matches = []
 for section in filter(lambda x: x['type'] == 'section', progressbar.progressbar(map_file)):
     # Find modules with symbols matching this section name
     match_modules = []
@@ -224,6 +245,24 @@ for section in filter(lambda x: x['type'] == 'section', progressbar.progressbar(
                                     module['symbols']))
         if len(match_symbols) != 0:
             match_modules += [module]
+
+    # Handle the 'text' section special case, these sections may be found across
+    # multiple obj files and multiple modules so we have to locate exactly which module
+    # we are refering to.
+    if section['section'] == 'text':
+        # Top level text doesn't belong to any submodule, just a top level efi file
+        if section['contents']['obj_path'] == '':
+            match_modules = []
+        else:
+            try:
+                section_archive, section_obj_file = re.findall('/([^\(/]+)\((.*)\)', section['contents']['obj_path'])[0]
+                if section_archive in ['libgcc.a']:
+                    match_modules = []
+                else:
+                    sec_module_name = re.findall('(.*?)\.lib', section_archive)[0]
+                    match_modules = list(filter(lambda mod: mod['module'] == sec_module_name, match_modules))
+            except IndexError:
+                print('hi')
 
     # Check in efi_debug_symbols if no matches found in obj files
     if len(match_modules) == 0:
@@ -235,6 +274,8 @@ for section in filter(lambda x: x['type'] == 'section', progressbar.progressbar(
             print('No match found for {}'.format(section['name']))
             no_matches += [section]
             continue
+        else:
+            efi_matches += [section]
 
     # Check more multiple module matches
     if len(match_modules) != 1:
@@ -259,6 +300,14 @@ for section in filter(lambda x: x['type'] == 'section', progressbar.progressbar(
 a = list(module_sizes.items())
 a.sort(key=lambda x: x[1], reverse=True)
 print('\n'.join(map(lambda x: '{:<7} {}'.format(x[1], x[0]), a)))
+
+# def print_sorted(x, key, ident, count=None):
+#     if count is None: count = len(x)
+#     a = x
+#     a.sort(key=key, reverse=True)
+#     m = max(map(lambda x: key(x), a))
+#     print('\n'.join(map(lambda x: '{{:<{}}} {{}}'.format(len('{}'.format(m))+1).format(key(x), ident(x)), a[:count])))
+# print_sorted(module_matches['DxeMain'], key=lambda x: x['contents']['size'], ident=lambda x: x['section'], count=50)
 
 az = {}
 for count,mult in map(lambda x: (len(x[1]), x), multiple_matches):
