@@ -1,0 +1,4 @@
+gdb-remote localhost:1234
+process status
+command script import lldb_pyscripts.py
+command script add setup -f local_lldb_setup

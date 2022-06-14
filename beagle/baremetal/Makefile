@@ -1,0 +1,83 @@
+MMC_SERIAL := 20090815198100000
+
+BEAGLE_ROOT := /home/kyle/dev/beagle
+ARCH_FLAGS := -mcpu=cortex-a8 -mfloat-abi=hard -marm
+CFLAGS := -ffunction-sections -O2 -g
+
+# LOAD_MEM ?= sram
+# LOAD_MEM ?= emif0_sdram
+LOAD_MEM ?= qemu_sram
+MEM_ADDRS := sram=0x402f0400 emif0_sdram=0x80000000 qemu_sram=0x42000000
+LOAD_ADDR := $(shell echo $(filter $(LOAD_MEM)%,$(MEM_ADDRS)) | sed -r 's/.*?=//')
+# LOAD_ADDR := $(if $(LOAD_MEM) eq sram,0x402f0400,$(if $(LOAD_MEM) eq 
+
+MKIMAGE := $(BEAGLE_ROOT)/beagle-gp-image.py
+
+OBJS := gpio_main.o
+
+.ONESHELL:;
+.SECONDEXPANSION:;
+
+%.o: $$*.c
+	arm-none-eabi-gcc $(ARCH_FLAGS) $(CFLAGS) -c -o $@ $*.c
+
+.compile: $(OBJS)
+	touch .compile
+
+link.fixed.lds: link.lds
+	sed -i.old -r 's/MEM_XXX/$(LOAD_MEM)/' link.lds
+	mv -v link.lds link.fixed.lds
+	mv -v link.lds.old link.lds
+
+gpio.elf: link.fixed.lds .compile
+	arm-none-eabi-ld --gc-sections --defsym _STACK_SIZE=0x1000 -Map gpio.map -T link.fixed.lds -n -o gpio.elf $(OBJS)
+
+start.bin: link.fixed.lds init.S
+	arm-none-eabi-gcc $(ARCH_FLAGS) -g -c -o start.o init.S
+	arm-none-eabi-ld --gc-sections -Map start.map -T link.fixed.lds -n -o start.elf start.o
+	arm-none-eabi-objcopy -O binary start.elf start.bin
+
+loop.bin: link.fixed.lds init.S
+	arm-none-eabi-gcc $(ARCH_FLAGS) -g -D_IDLE_LOOP -c -o init.o init.S
+	arm-none-eabi-objcopy --add-section .sect_loop=init.o --rename-section .sect_loop=.text init.o loop.o
+	arm-none-eabi-ld --gc-sections -Map loop.map -T link.fixed.lds -n -o loop.elf loop.o
+	arm-none-eabi-objcopy -O binary loop.elf loop.bin
+#	rm -v init.o
+#	rm -v loop.o
+#	rm -v loop.elf
+
+qemu_targets: start.bin loop.bin
+
+
+.image: $(MKIMAGE) gpio.elf
+	arm-none-eabi-objcopy -O binary gpio.elf gpio.bin
+	$(MKIMAGE) gpio.bin $(LOAD_ADDR)
+	touch .image
+
+load: .image
+	@SERIAL_COL=$$(($$(lsblk -l -p -O | head -n 1 | sed 's/SERIAL.*//' | wc | sed -r 's/([ ]+[^ ]+){2}[ ]+//') - 1))
+	@NAME_COL_LEN=$$(($$(lsblk -l -p -O | head -n 1 | sed -r 's/([^ ]+[ ]+).*/\1/' | wc | sed -r 's/([ ]+[^ ]+){2}[ ]+//') - 1))
+# echo 's/((.){'$${NAME_COL_LEN}'})(.){'$$(($${SERIAL_COL} - $${NAME_COL_LEN} - 1))'}/\1/'
+	@MMC_DEV=$$(lsblk -l -p -O | sed -r 's/((.){'$${NAME_COL_LEN}'})(.){'$$(($${SERIAL_COL} - $${NAME_COL_LEN} - 1))'}/\1/' | grep $(MMC_SERIAL) | sed -r 's/[ ]+.*//')
+	cp -v fat12.img mmc.img
+	losetup -f -P mmc.img
+	mount /dev/loop0p1 /mnt/tmp0
+	cp gpio.bin /mnt/tmp0/MLO
+	umount /mnt/tmp0
+	dd if=mmc.img of=$${MMC_DEV} bs=4096 status=progress
+	dd if=$${MMC_DEV} of=u-boot.img.readback bs=4096 count=$$((2**21 / 4096)) status=progress
+#	dd if=u-boot.img of=$${MMC_DEV} bs=4096 status=progress
+#	dd if=$${MMC_DEV} of=u-boot.img.readback bs=4096 count=$$((2**17 / 4096)) status=progress
+	if [[ $$(diff mmc.img u-boot.img.readback) ]]; then \
+	  echo Writing image failed...; \
+	fi
+	rm -f u-boot.img.readback
+
+all: image
+
+clean:
+	rm -f $(OBJS)
+	rm -f link.fixed.lds
+	rm -f gpio.elf
+	rm -f gpio.bin
+	rm -f u-boot.img

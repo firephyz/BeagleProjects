@@ -1,0 +1,7 @@
+label: dos
+label-id: 0x5c0cd004
+device: /dev/sdd
+unit: sectors
+sector-size: 512
+
+/dev/sdd1 : start=           1, size=      2047, type=6

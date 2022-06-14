@@ -1,0 +1,47 @@
+This is arm-core-notes.info, produced by makeinfo version 6.7 from
+arm-core-notes.texi.
+
+\input textinfo
+
+
+File: arm-core-notes.info,  Node: Top,  Next: Fetch Process,  Up: (dir)
+
+ARM Core Functionality Notes
+****************************
+
+* Menu:
+
+* Fetch Process::
+
+
+File: arm-core-notes.info,  Node: Fetch Process,  Prev: Top,  Up: Top
+
+Instruction Fetch Process:
+  1. Processor issues instruction fetch.
+  2. Simultaeously does the following:
+        * Translates VA via TLB. If protection check fails, the fetch
+          aborts.
+            VAs use Secure or Non-secure TLBs depending on the processor
+          state.
+        * Looks up address in L1 cache.
+  3. Returns L1 hit, otherwise PA (post-translation) is passed to L2
+     cache.
+  4. Returns L2 hit, otherwise issues AXI transaction to fetch from
+     external memory.
+          Non-secure access: If processor is in Non-secure mode or in
+          secure mode and memory location has non-secure attribute.
+          Secure access: If processor is in secure state and memory
+          location has secure attribute.
+
+
+
+Tag Table:
+Node: Top106
+Node: Fetch Process268
+
+End Tag Table
+
+
+Local Variables:
+coding: utf-8
+End:

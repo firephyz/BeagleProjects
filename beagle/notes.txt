@@ -1,0 +1,101 @@
+Linux Configuration
+  AM335x
+    TI_PRUSS config parameter
+
+  EFIVAR_FS
+
+new case, basic_machine-basic_os; each two fields
+old case; look for recognized kernel-os combinations
+  cpu-vendor-os
+  cpu-kernel-os
+    basic_machine = cpu
+    basic_os = kernel-os combo
+      kernel-os:
+        linux-*
+        else:
+          basic_machine = cpu-vendor
+          basic_os = os
+
+basic_machine
+  just cpu in the case of newer kernel-os combo provided
+
+basic_machine
+  *-* -> cpu-vendor
+  * -> cpu-unknown
+
+basic_os
+  gnu/linux* -> linux-gnu
+  *-* -> kernel-os
+  linux* -> linux-gnu
+  else
+    kernel=
+    os
+
+OSes may be one of
+(musl*|newlib*|uclibc*)
+eabi*|gnueabi*
+gnu|android|elf|
+
+<sysroot>/<native-system-header-dir>
+
+native-system-header-dir
+  sets the suffix on the first include directory
+
+#-#-#-#-#   Linux TODO [ TBD ]   #-#-#-#-#
+Kernel SLAB merging and freelist exploits
+  - per-kernel option exploits...
+    - SLAB_FREELIST_HARDENED for
+      - example probably removes some exploits
+
+
+
+U-Boot
+  SYS_BOOT_GET_CMDLINE - kernel command line saving
+  SYS_MALLOC_F - early malloc for driver model and such
+
+  Config Trees to Explore
+    SPL
+    Command Line
+    Device Tree
+      - DM_SEQ_ALIAS for /aliases node support
+    Environment
+    Device Drivers
+
+  Configs To Explore
+    CONFIG_HW_WATCHDOG
+    CONFIG_NOR
+    CONFIG_MTD_RAW_NAND
+    CONFIG_BOARD_LATE_INIT
+    CONFIG_OF_CONTROL
+
+AM335X
+  Memory Map
+    0x0000_0000 - 0x2000_0000 (0x2000_0000) GPMC (General Purpose Mem Controller, external memory)
+    0x4000_0000 - 0x4002_C000 (0x2C000) Boot ROM
+      0x00000 - 0x20000 (128KB)
+      0x20000 - 0x2C000 (48KB)
+    0x402F_0000 - 0x4030_0000 (64KB) SRAM internal
+      0x000 - 0x400 (1KB) reserved
+    0x4030_0000 - 0x4031_0000 (64KB) L3 OCMC0
+    0x8000_0000 - 0xC000_0000 (1GB) EMIF0 SDRAM (external memory interface)
+
+  Peripherals
+    0x44E0_9000 - 0x44E0_A000 (4KB) UART0
+    
+  Public RAM
+    0x402F0400 - 0x40310000 (0x20000)
+      0x402F0400 - 0x4030B800 (0x1B400) image
+      0x4030B800 - 0x4030CE00 (0x1600) stack
+      0x4030CE00 - 0x40310000 (0x3200) vectors, tracing & static variables
+  Init
+    Images
+      Image on sector
+        Detection valid when first four bytes are not all 0's or 1's
+      GP Image Format (with header)
+        0-4 Size
+	4-8 Destination
+	8-... Image
+      Load Destination is Entry Point
+    MMC
+      4 Image Locations at 0KB, 128KB, 256KB, 384KB
+      

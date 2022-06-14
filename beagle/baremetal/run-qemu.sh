@@ -1,0 +1,33 @@
+#!/bin/bash
+
+DEBUG=y
+MON_ON_STDIO=y
+
+MACHINE="-machine virt -machine virtualization=on -machine secure=on -cpu cortex-a15 -smp cpus=1,cores=1,maxcpus=4"
+# MACHINE="-machine xilinx-zynq-a9 -smp cpus=1,cores=4,maxcpus=4"
+
+LOADER_ADDR=0x42000000
+LOADER_LOOP_ADDR=0x42000000
+CPU_LOOP_LOADERS=""
+# CPU_LOOP_LOADERS="\
+# -device loader,addr=${LOADER_LOOP_ADDR},file=start.bin,cpu-num=1,force-raw=on \
+# -device loader,addr=${LOADER_LOOP_ADDR},file=start.bin,cpu-num=2,force-raw=on \
+# -device loader,addr=${LOADER_LOOP_ADDR},file=start.bin,cpu-num=3,force-raw=on"
+
+old_qemu_pid=$(ps -e | grep qemu | head -n 1 | sed -r 's/[ ]*([^ ]+).*/\1/')
+if [[ ! -z $old_qemu_pid ]]; then
+    kill -s KILL $old_qemu_pid;
+fi
+
+test $MON_ON_STDIO = y && QEMU_MON_ARGS="-mon chardev=iocon" || QEMU_MON_ARGS=
+test $DEBUG = y && QEMU_DEBUG_ARGS="-s -S" || QEMU_DEBUG_ARGS=
+
+QEMU_CMD=$(echo qemu-system-arm -display none -audiodev none,id=nullaudio \
+		${QEMU_DEBUG_ARGS} \
+		${MACHINE} \
+		-chardev stdio,id=iocon,mux=on \
+		${QEMU_MON_ARGS} \
+		-device loader,addr=${LOADER_ADDR},file=start.bin,cpu-num=0,force-raw=on \
+		${CPU_LOOP_LOADERS})
+
+eval $QEMU_CMD
