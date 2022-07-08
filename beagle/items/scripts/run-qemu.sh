@@ -19,15 +19,18 @@ if [[ ! -z $old_qemu_pid ]]; then
     kill -s KILL $old_qemu_pid;
 fi
 
+#		--trace "events=trace-events.txt,file=trace" \
+
 test $MON_ON_STDIO = y && QEMU_MON_ARGS="-mon chardev=iocon" || QEMU_MON_ARGS=
 test $DEBUG = y && QEMU_DEBUG_ARGS="-s -S" || QEMU_DEBUG_ARGS=
 
-QEMU_CMD=$(echo qemu-system-arm -display none -audiodev none,id=nullaudio \
+QEMU_ARGS=$(echo -display none -audiodev none,id=nullaudio \
 		${QEMU_DEBUG_ARGS} \
 		${MACHINE} \
 		-chardev stdio,id=iocon,mux=on \
 		${QEMU_MON_ARGS} \
-		-device loader,addr=${LOADER_ADDR},file=start.bin,cpu-num=0,force-raw=on \
+		-device loader,addr=${LOADER_ADDR},file=gpio.bin,cpu-num=0,force-raw=on \
 		${CPU_LOOP_LOADERS})
+qemu-system-arm ${QEMU_ARGS}
 
-eval $QEMU_CMD
+# eval $QEMU_CMD

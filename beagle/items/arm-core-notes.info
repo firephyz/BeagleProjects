@@ -1,0 +1,254 @@
+This is arm-core-notes.info, produced by makeinfo version 6.7 from
+arm-core-notes.texi.
+
+\input textinfo
+
+
+File: arm-core-notes.info,  Node: Top,  Next: Design and Model,  Up: (dir)
+
+ARM Core Functionality Notes
+****************************
+
+* Menu:
+
+* Design and Model::
+* Detailed Breakdowns::
+* Register Layouts::
+* Notes::
+
+
+File: arm-core-notes.info,  Node: Design and Model,  Next: Detailed Breakdowns,  Prev: Top,  Up: Top
+
+* Menu:
+
+* Modes::
+* Exceptions and Their Configurations::
+
+
+File: arm-core-notes.info,  Node: Modes,  Up: Design and Model
+
++-------------------------------------------------------
+| Mode        Encoding     Priv.          Sec. State
+|                          (def. PL1)     (def. Both)
++-------------------------------------------------------
+| User        0x10         PL0            
+| FIQ         0x11
+| IRQ         0x12
+| Supervisor  0x13                                         Taken here on reset                                         
+| Abort       0x17                                         Data & Prefetch Aborts taken here
+| Undefined   0x1b                                         Instr. related & undef except taken here
+| System      0x1f
+|
+| Monitor     0x16                        Secure only
+| Hyp         0x1a         PL2            Non-sec only
+
+
+Common/Banked Register Breakdown (unless otherwise noted in *Note Mode quirks::)
+     +---------------+--------------+------------------
+     |               | Common       | Banked
+     |Modes          |              |
+     +---------------+--------------+------------------
+     |User & System    All,CPSR       N/A
+     |Other Modes      R0-R12,CPSR    SP,LR,PC & SPSR
+     +-------------------------------------------------
+
+Mode Quirks
+     FIQ
+        FIQ-specific bank registers R8-R12
+     Hyp
+        SVC calls in hyp mode are taken to the same PL2 virtualized hyp mode
+        Has User-common LR (not used???); hyp mode version of LR (according execution arch) is ELR
+
+
+File: arm-core-notes.info,  Node: Exceptions and Their Configurations,  Up: Design and Model
+
+* Menu:
+
+* Kinds of Exceptions::
+* Exception Return::
+* Exception Masking::
+* Exception Entry: Exception Entry.
+
+Kinds of Exceptions:
+     +----------------------------------------------------------------
+     | Exception Type            To Mode          Return Addr
+     |                                            (Def. next instr.)
+     +----------------------------------------------------------------
+     | Reset                     Reset
+     | Undef. Instr.             Undef. Instr.    Failed Instr.
+     | SVC, SMC, HVC             Supervisor
+     | Hyp Trap                  ???              ???
+     | Prefetch & Data Aborts    Abort            Failed Instr.
+     | IRQ                       IRQ
+     | FIQ                       FIQ
+     | Virtual Abort             ???
+     | Virtual IRQ               ???
+     | Virtual FIQ               ???
+     +----------------------------------------------------------------
+
+Exception Return:
+     Return Instructions:
+       * RFE <base_reg>                                ; load PC and CPSR (in that order) from address in base_reg ; PC & CPSR from memory
+       * SUBS pc, lr, [<imm> adjust]                   ; (or if zero adjust, use MOV)                              ; PC from instr, CPSR from SPSR
+       * LDM(I|D)(A|B) <base_reg> {<reg_list_with_pc>} ; lowest reg at lowest address                              ; PC & CPSR from memory
+     PC alignment implied by hardware
+
+Exception Masking
+     CPSR.(A|I|F) bits enable masking of asynch., IRQ and FIQ exceptions respectively.
+       - what are synch.  and asynch.  aborts?
+     SCR.(AW|FW) bits:
+       Non-virt-cpu: Locks non-secure writing of the CPSR.(A|I|F) bits.
+           virt-cpu: CPSR mask bypass disable when routing asynch.  or FIQ except.  (AW,FW respectively) to secure mode
+     (SCR.EA = 1).
+             - When 0 (bypass enabled), CPSR.(A|I|F) releavent flags are still masked in secure mode but exceptions
+     coming from non-secure code are routed to secure monitor mode.
+
+
+File: arm-core-notes.info,  Node: Detailed Breakdowns,  Next: Register Layouts,  Prev: Design and Model,  Up: Top
+
+* Menu:
+
+* Fetch Process::
+* Exception Entry::
+
+
+File: arm-core-notes.info,  Node: Fetch Process,  Up: Detailed Breakdowns
+
+Instruction Fetch Process:
+  1. Processor issues instruction fetch.
+  2. Simultaeously does the following:
+        * Translates VA via TLB. If protection check fails, the fetch aborts.
+             VAs use Secure or Non-secure TLBs depending on the processor state.
+        * Looks up address in L1 cache.
+  3. Returns L1 hit, otherwise PA (addr after translation) is passed to L2 cache.
+  4. Returns L2 hit, otherwise issues AXI transaction to fetch from external memory.
+          Non-secure access: If processor is in Non-secure mode or in secure mode and memory location has non-secure
+          attribute.
+          Secure access: If processor is in secure state and memory location has secure attribute.
+
+  Memory Access Sequence
+  1. Issues TLB lookup based on requested VMA, ASID and security state.  TLB entry matches if all:
+        * Requested VA matches TLB assigned vA.
+        * NSTID matches secure or non-secure state of request.
+        * ASID matches current ASID or is global.
+  2. Performs TLB walk if lookup misses.
+
+
+File: arm-core-notes.info,  Node: Exception Entry,  Up: Detailed Breakdowns
+
+Exception Entry:
+  1. Determines mode to take the exception in.
+  2. Save link value in releavent target mode register (usually LR but could be ELR if taken to a PL2 mode)
+       Failures (undef.  instr., prefetch and data aborts) link to the instruction that caused the exception.
+       Non-failures (synchronous calls excepts., IRQ, FIQ and virtual exceptions) link to the next instruction after the
+     exception-causing one.
+  3. CPSR is saved in target mode SPSR.
+  4. Set to secure state (SCR.NS = 0) if taking from secure monitor mode, otherwise leave SCR.NS unchanged.
+  5. Set exception CPSR
+        * .M -> exception processor state
+        * .(A|I|F) -> (optionally) corresponding exception mask to disable nested exceptions
+        * .(T|J) -> ISA state
+        * .E -> exception endianess
+        * .IT -> clear IT block
+  6. Set PC to corresponding exception vector
+
+
+File: arm-core-notes.info,  Node: Register Layouts,  Next: Notes,  Prev: Detailed Breakdowns,  Up: Top
+
+* Menu:
+
+* CPSR::
+* SCTLR::
+
+************************** CPSR ****************************
+       CN  31           Negative condition 
+       CZ  30           Zero condition
+       CC  29           Carry condition
+       CV  28           Overflow condition
+       Q   27           Cumulative saturate Condition
+       IT  26:25,15:10  IT execution block state
+       J   24           Jazelle execution
+       GE  19:16        Greater-than or equal-to flags for SIMD instructions
+       E   9            Endianess
+       A   8            Asynchronous Abort Mask
+       I   7            IRQ mask
+       F   6            FIQ mask
+       T   5            Thumb execution
+       M   4:0          Processor mode
+
+
+************************** SCTLR ****************************
+                    Reset
+                  Input |
+                  TLB | |
+                Sec | | |
+               RW | | |Depr
+       	 | | | | | |
+       TE   30        I 0
+       AFE  29      S   0
+       TRE  28      S   0        
+       NMFI 27 RO C   I 0        NMFI supp. (not Virt. ext.)
+       EE   25        I 0
+       VE   24          0 V      IMP DEF IRQ,FIQ Vecs. Supp.
+       FI   21    C     0        Fast Int. Supp.
+       UWXN 20          0
+       WXN  19          0
+       HA   17          0 L      Hw access flag manag.
+       RR   14 SL C     0        Cache replace. strat. Supp.
+       V    13        I 0
+       I    12          0        Instr. Cache Supp.
+       Z    11          0        Program flow pred. supp. or pred. config supp.
+       SW   10          0        SWP, SWPB supp.
+       BEN   5          1        Barrier ops supp.
+       C     2          0        Data or unified cache supp.
+       A     1          0
+       M     0          0
+       
+       SL - Sec locked; RO in non-secure mode
+
+
+File: arm-core-notes.info,  Node: Notes,  Up: Top
+
+(NSTID?) PD0 or PD1 in TTB CR to enable TLB walks
+
+  Note, care must be taken to ensure that only a single TLB matches at any one time.
+
+  secure stage 1 MMU non-secure stage 1 MMU non-secure stage 2 MMU non-secure PL2 stage 1 MMU
+
+  VA -+-----+-- Sec --> S1_MMU ---------------> PA | | | +-- NSec -> S1_MMU -+- Not PL2 ------> PA | | +- PL2
+---------------+- PL2 -> S2_MMU -> PA
+
+  Cache Notes Possible write buffer situated in between cache and main memory to allow the cache to still operate after
+a line has been evicted back to main memory; the write buffer will overload the writes to main memory from the cache.
+
+  Layer-by-layer attribute modification (constraining and expanding attrs perhaps?)  in multi-staged MMU designs.  L3
+interconnect load monitoring
+
+  Cache cleaning (write-back coherency by other observers) doesn't update memory if it was already updated by an
+observer outside the shareability domain of that cached address location?
+
+
+
+Tag Table:
+Node: Top106
+Node: Design and Model329
+Node: Modes493
+Ref: Mode quirks1746
+Node: Exceptions and Their Configurations1985
+Ref: Kinds of Exceptions2194
+Ref: Exception Return3010
+Ref: Exception Masking3518
+Node: Detailed Breakdowns4089
+Node: Fetch Process4254
+Node: Exception Entry5369
+Node: Register Layouts6331
+Ref: CPSR6466
+Ref: SCTLR7144
+Node: Notes8236
+
+End Tag Table
+
+
+Local Variables:
+coding: utf-8
+End:

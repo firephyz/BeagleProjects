@@ -366,9 +366,133 @@ A4. Application Level Instruction sets
 
 
 B1. System Level Programmer's Model
-  8. Exception Handling
-    Vectored interrupts for IRQs and FIQs (8-word interrupt address vector starting at an exception vector base address).
+  2. System Concepts and Terms
+    States
+      Instruction Set State (ARM, Thumb, Jazelle or ThumbEE)
+      Execution State (part of PSRs ISA state, IT blocks and endianess)
+      Security State (optional but also implied by virtualization)
+      Debug State (if halted with intrusive debugging)
+    Priviledge Level
+      PL0, PL1 and (hypervisor mode only) PL2
+    Exceptions
+      Destination mode determined by
+        Exception type & Source mode
+        Also Security and Virtualization configurations
+      Types
+        Synchronous Exceptions - caused by an instruction and return address is that of the instruction
+	Asynchronous Exceptions - not caused by an instruction or the return address points somewhere different from last instruction
+	  Processor mode might be able to change after the except. is generated.
+	  Precise async except. present processor state consistent with that at the instructions from which the except. was taken.
+	  Imprecise async except. present processor state that might be inconsistent with that at the instructions from which the except. was taken.
+      Relation to priviledge and security state
+        Can never take an except. from a secure mode to a non-secure mode.
+	On generation, From PL <= To PL and on returning from except. PL >= returned PL.
+	Exceptions from Hyp. mode must go to hyp. mode or secure monitor mode.
+  3. Processor Modes and Core Registers
+    Modes
+      User       (usr) PL0
+      FIQ        (fiq)
+      IRQ        (irq)
+      Supervisor (svc)
+      Monitor    (mon)      Secure only
+      Abort      (abt)
+      Hyp        (hyp) PL2  Non-secure only
+      Undef.     (und)
+      System     (sys)
+    Mode Notes
+      usr - unpriviledge access to system; can only change modes with an exception
+      sys - priviliedge access to system, same registers as usr; Can't be entered via an exception
+      svc - default mode of SVC instr.; entered on reset
+      abt - default mode of data or prefetch aborts
+      und - instr-related exceptions including UNDEFINED instruction
+      fiq - fiq interrupt taken here
+      irq - irq interrupt taken here
+      hyp - some non-secure exceptions routed here; HVC & hyp. trap are always taken here (can't be generated from secure mode)
+      mon - PL1 can issue SMC (secure monitor call) to enter secure monitor mode (always secure); has access to secure and non-secure registers. Only way to change sec state.
+  5. Security Extensions
+    Adds seperate secure translation regime, many secure banked system registers and a unique Monitor execution mode for switching between secure and non-secure mode.
+    Allows for more secure software:
+      Prevents non-secure software from accessing memory designated as secure.
+      Some system controls are not assessible in non-secure mode.
+      Secure transition (from non-secure) is only available through a small set of exceptions.
+        - Same for exiting secure state to non-secure state.
+      Many OS and hyp operations can be handling without changing security state (reducing transition space and need).
+    SCR.NS bit determines secure state (when not in Monitor mode or hyp mode; they have default secure values).
+      - monitor mode ignores NS bit; always secure.
     
+  8. Exception Handling
+    Two Interrupt Schemes (switch with SCTLR.VE (Sec banked as well))
+      Single static interrupt base addresses for IRQ nad FIQ that dynamically dispatch based off of the exception type.
+      Vectored interrupts for IRQs and FIQs (8-word interrupt address vector starting at an exception vector base address). Dispatch happens in the table.
+    Varieties of Vector Tables
+      No Security Extensions
+        SCTLR.V = 0 selects normal vectors situated at 0x0000_0000
+	SCTLR.V = 1 selects high vectors (Hivecs) at 0xFFFF_0000
+      Security Extensions
+        Monitor vector table    - taken to secure monitor mode and uses secure translation regime.
+	Secure vector table     - taken to secure PL1 mode in general (not monitor) and uses secure translation regime.
+	Non-secure vector table - taken to non-secure PL1 modes and uses non-secure translation regime.
+	Hyp vector table        - taken to non-secure hyp PL2 mode and uses non-secure translation regime.
+
+        Exception Vector Base Addr (as determined by destination mode)
+	  Monitor Mode : MVBAR
+	  Hyp. Mode : HVBAR (what about SCTLR.V and highvecs?)
+	  Other
+    	    SCTLR.V = 1 : highvecs
+    	    SCTLR.V = 0 :
+    	      Non-Secure: 0x0000_0000
+    	      Secure: VBAR (VBAR_S in secure mode)
+      Tables and Offsets
+                            Exception Offset Mapping By Mode
+            +--------------+---------------+-------------+---------------+
+            |  Hypervisor  |   Monitor     |   Secure    |  Non-Secure   |
+	    +--------------+---------------+-------------+---------------+
+        0x00|              |               |    Reset    |               |
+	0x04|              |               | Undef Instr |  Undef Instr  |
+	0x08|  Hyp. Call   | Sec. Mon. Cal |  Svr Call   |   Svr Call    |
+	0x0C|----------------------- Prefetch Abort ---------------------|
+	0x10|------------------------- Data Abort -----------------------|
+	0x14| Hyp.Trap/Ent |                                             |
+	0x18|---------------------------- IRQ ---------------------------|
+	0x1C|---------------------------- FIQ ---------------------------|
+            +____________________________________________________________+
+
+                                         Mode Transitions By Exception Type
+              +---------------+----------------++---------------+-----------------++--------------+
+              | User (PL0 NS) | System (PL0 S) || Svr (PL1 NS)  | Sec.Mon (PL1 S) || Hyp (PL2 NS) |
+	      +---------------+----------------++---------------+-----------------++--------------+
+Reset         |                                ||                                 ||              |
+Undef. Instr. |                                ||                                 ||              |
+Escal. Call   |                                ||                                 ||              |
+Preftc Abrt.  |                                ||                                 ||              |
+Data Abort    |                                ||                                 ||              |
+Hyp Call      |                                ||                                 ||              |
+IRQ Int.      |                                ||                                 ||              |
+FIQ Int.      |                                ||                                 ||              |
+              +________________________________||_________________________________||______________+
+
+      Exception Priority Order
+        Exceptions from Breakpoint debug event or vector catch debug event (address match form); these occur before instruction execution
+        Instructions may generate a single Prefetch Abort exception.
+	Undefined instr. exception or hyp trap don't access memory and can't cause Data aborts.
+	  If an instr generates both an undef instr. exception and hyp trap, then undef instr. has priority (more general undef instr has priority over hyp trap)
+	If system call generates undef instr. or hyp trap, then those take priority over system call.
+	A memory access that generates MMU (MPU) fault or sync. watchpoint debug event must not generate an external abort.
+	All other sync. exceptions from instructions are mutually exclusive.
+      Asynchronous Exceptions
+        Async except. before context sync. events occur before the first instruction in the new context.
+	  Context sync events: ISB instr, taking or returning from an exception, exiting debug state.
+	Priority of sync except. over async except is IMP DEF.
+	CPSR has mask bits for every type of async except.
+	CPSR has async except status bits to indicate the type of exception that was taken.
+      Hypervisor Trap/Entry (offset 0x14)
+        Hyp Traps
+	If coming from a mode != hypvisor mode
+	  Hyp call
+	  Some general exceptions (from PL0 ???) when HCR.TGE (trap general except.) is set to 1
+	  
+
+
 B3. VMSA (Virtual Memory System Architecture)
   11. Caches
     Data & Unified Caches

@@ -18,12 +18,16 @@ REGION_ALIAS("LOAD_REGION", MEM_XXX)
 ENTRY(_start)
 
 SECTIONS {
-  . = 0x0;
-  .skip (NOLOAD) : {
-    . = . + 0x400; /* Skip first 1K */
-  } >sram
+/*   . = 0x0;
+ *   .skip (NOLOAD) : {
+ *     . = . + 0x400; /\* Skip first 1K *\/
+ *   } >sram */
 
   .text : ALIGN(0x10) {
+    *(.start)
+    *(.text.vectors)
+    *(.text.early_asm)
+/*     KEEP(*(.text.isr)) */
     *(.text)
     *(.text.*)
   } >LOAD_REGION
@@ -37,6 +41,7 @@ SECTIONS {
     *(.bss)
     *(.bss.*)
 
+    . = ALIGN(_STACK_SIZE);
     _stack_bottom = .;
     . = . + _STACK_SIZE;
     PROVIDE(_stack_top = .);
@@ -51,3 +56,4 @@ SECTIONS {
     *(*)
   }
 }
+

@@ -5,7 +5,7 @@ import os
 import math
 
 endians = {'little': -1, 'big': 1}
-endian = 'little'
+endian = 'big'
 
 def gen_toc_header():
     convert_endian = lambda y: bytes('', 'ascii').join(map(lambda x: x[::endians[endian]], y))
@@ -21,7 +21,9 @@ def gen_toc_header():
     toc_start = toc_struct_1 + toc_struct_2 + magic
     toc_padding = bytes(512 - len(toc_start))
     return toc_start + toc_padding
-                   
+
+flags_start = 2
+config = {'raw_mode': False}
 
 try:
     file = sys.argv[1]
@@ -31,8 +33,20 @@ except IndexError:
     
 try:
     dest = int(sys.argv[2], 16)
+    flags_start = 3
 except IndexError:
     dest = 0x402F0400
+
+def do_raw_flag():
+    config['raw_mode'] = True
+
+flags = {'-raw': do_raw_flag}
+for arg in sys.argv[flags_start:]:
+    try:
+        flags[arg]()
+    except KeyError:
+        print('Invalid flag \'{}\''.format(arg))
+        exit(1)
 
 binfile = open(file, 'rb').read()
 filesize = len(binfile)
@@ -43,11 +57,12 @@ outfilename = '{}/u-boot.img'.format(os.getcwd())
 print('Writing to {}...'.format(outfilename))
 int2bytes = lambda n: bytes.fromhex('{{:0{}x}}'.format(math.ceil(math.log2(n)/32)*8).format(n))[::endians[endian]]
 
-toc_header = gen_toc_header()
 sizebytes = int2bytes(filesize)
 destbytes = int2bytes(dest)
 payloadbytes = binfile
-imagebytes = toc_header + sizebytes + destbytes + payloadbytes
+imagebytes = sizebytes + destbytes + payloadbytes
+if config['raw_mode']:
+    imagebytes = gen_toc_header() + imagebytes
 padding = bytes(0x20000-len(imagebytes))
 
 outfile = open(outfilename, 'wb+')

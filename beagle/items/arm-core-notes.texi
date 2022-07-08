@@ -1,0 +1,338 @@
+@c @node node-name, next-node, prev-node, parent-node
+@c   node command tells how to situate a node within the node tree
+@c Menus
+@c   menu entries have the form: '[entry-display-name]:[\(filename\)]node-name(,|. |\t|\n) [description]'
+@c     or '[\(filename\)]node-name-same-as-display-name:: [description]
+
+\input textinfo
+@settitle ARM Core Functionality Notes
+
+@c @c Title page
+@c @titlepage
+@c @title Test
+@c @end titlepage
+
+@c @c Table of contents
+@c @contents
+
+@macro ii
+@*@w{  }
+@end macro
+
+@c @ifnottex
+@node Top
+@top ARM Core Functionality Notes
+@c @end ifnottex
+
+@menu
+* Design and Model::
+* Usage::
+* Detailed Breakdowns::
+* Register Layouts::
+* Notes::
+@end menu
+
+@c -------------------------------------------------------------------------------------------------
+@c Design and Model
+@c -------------------------------------------------------------------------------------------------
+@node Design and Model
+@menu
+* Modes::
+* Exceptions and Their Configurations::
+@end menu
+
+@node Modes,,, Design and Model
+@verbatim
++-------------------------------------------------------
+| Mode        Encoding     Priv.          Sec. State
+|                          (def. PL1)     (def. Both)
++-------------------------------------------------------
+| User        0x10         PL0            
+| FIQ         0x11
+| IRQ         0x12
+| Supervisor  0x13                                         Taken here on reset                                         
+| Abort       0x17                                         Data & Prefetch Aborts taken here
+| Undefined   0x1b                                         Instr. related & undef except taken here
+| System      0x1f
+|
+| Monitor     0x16                        Secure only
+| Hyp         0x1a         PL2            Non-sec only
+
+@end verbatim
+
+@noindent
+Common/Banked Register Breakdown (unless otherwise noted in @xref{Mode quirks})
+@indentedblock
+@verbatim
++---------------+--------------+------------------
+|               | Common       | Banked
+|Modes          |              |
++---------------+--------------+------------------
+|User & System    All,CPSR       N/A
+|Other Modes      R0-R12,CPSR    SP,LR,PC & SPSR
++-------------------------------------------------
+@end verbatim
+@end indentedblock
+
+@c @itemize @w{}
+@c   @item Common registers (User & System):@w{ }All
+@c   @item Common registers (in all modes):@w{  }PC & CPSR
+@c   @item Banked Registers:@w{                 }LR, SP & SPSR (unless specified in @xref{Mode quirks})
+@c @end itemize
+
+@noindent
+Mode Quirks
+@anchor{Mode quirks}
+@itemize @w{}
+  @item FIQ
+    @ii FIQ-specific bank registers R8-R12
+  @item Hyp
+    @ii SVC calls in hyp mode are taken to the same PL2 virtualized hyp mode
+    @ii Has User-common LR (not used???); hyp mode version of LR (according execution arch) is ELR
+@end itemize
+
+@node Exceptions and Their Configurations,,, Design and Model
+@menu
+* Kinds of Exceptions::
+* Exception Return::
+* Exception Masking::
+* Exception Entry: Exception Entry.
+@end menu
+
+@anchor{Kinds of Exceptions}
+@noindent Kinds of Exceptions:
+@indentedblock
+@verbatim
++----------------------------------------------------------------
+| Exception Type            To Mode          Return Addr
+|                                            (Def. next instr.)
++----------------------------------------------------------------
+| Reset                     Reset
+| Undef. Instr.             Undef. Instr.    Failed Instr.
+| SVC, SMC, HVC             Supervisor
+| Hyp Trap                  ???              ???
+| Prefetch & Data Aborts    Abort            Failed Instr.
+| IRQ                       IRQ
+| FIQ                       FIQ
+| Virtual Abort             ???
+| Virtual IRQ               ???
+| Virtual FIQ               ???
++----------------------------------------------------------------
+@end verbatim
+@end indentedblock
+
+@anchor{Exception Return}
+@noindent Exception Return:
+@itemize @w{}
+  @item Return Instructions:
+@verbatim
+  * RFE <base_reg>                                ; load PC and CPSR (in that order) from address in base_reg ; PC & CPSR from memory
+  * SUBS pc, lr, [<imm> adjust]                   ; (or if zero adjust, use MOVS)                             ; PC from instr, CPSR from SPSR
+  * LDM(I|D)(A|B) <base_reg> {<reg_list_with_pc>} ; lowest reg at lowest address                              ; PC (and others) from memory, CPSR from SPSR
+@end verbatim
+  @item PC alignment implied by hardware
+@end itemize
+
+@anchor{Exception Vector Offsets}
+@noindent Exception Vector Offsets
+@verbatim
+                            Exception Offset Mapping By Mode
+            +--------------+---------------+-------------+---------------+
+            |  Hypervisor  |   Monitor     |   Secure    |  Non-Secure   |
+	    +--------------+---------------+-------------+---------------+
+        0x00|              |               |    Reset    |               |
+	0x04|              |               | Undef Instr |  Undef Instr  |
+	0x08|  Hyp. Call   | Sec. Mon. Cal |  Svr Call   |   Svr Call    |
+	0x0C|----------------------- Prefetch Abort ---------------------|
+	0x10|------------------------- Data Abort -----------------------|
+	0x14| Hyp.Trap/Ent |                                             |
+	0x18|---------------------------- IRQ ---------------------------|
+	0x1C|---------------------------- FIQ ---------------------------|
+            +____________________________________________________________+
+@end verbatim
+
+@anchor{Exception Masking}
+@noindent Exception Masking
+@itemize @w{}
+@item CPSR.(A|I|F) bits enable masking of asynch., IRQ and FIQ exceptions respectively.
+@*    @w{  }- what are synch. and asynch. aborts?
+@item SCR.(AW|FW) bits:
+@*    @w{  }Non-virt-cpu: Locks non-secure writing of the CPSR.(A|I|F) bits.
+@*    @w{      }virt-cpu: CPSR mask bypass disable when routing asynch. or FIQ except. (AW,FW respectively) to secure mode (SCR.EA = 1).
+@*    @w{        }- When 0 (bypass enabled), CPSR.(A|I|F) releavent flags are still masked in secure mode but exceptions coming from non-secure code are routed to secure monitor mode.
+@end itemize
+
+@c -------------------------------------------------------------------------------------------------
+@c Usage
+@c -------------------------------------------------------------------------------------------------
+@node Usage
+@menu
+* Barrier Operations::
+@end menu
+
+@node Barrier Operations,,, Usage
+@noindent
+@itemize
+  @item ISB (Instr. Sync. Barrier) - Synchronizes processor context in preparation for the next instruction (finishes all instrs. before ISB and flushes old context).
+    ensures completion of context ops before continuing
+  @item DSB (Data   Sync. Barrier) - Ensures the completion of all memory accesses (and cache/TLB/branch maintenance ops) before the next instruction.
+    ensures ordering & completion of data ops before continuing but it doesn't recreate processor context
+  @item DMB (Data  Memory Barrier) - Ensures that
+    ensures correct memory ordering of accesses ???
+
+all accesses by the domain that 'are observed' before DSB
+all loads that occur before observers (of those loads) performs a group A access.
+  - I think should only apply to prefetching loads 'after' the Pe's DMB ('after' because how does one define relevent ('after') prefetching loads of processors that aren't the Pe).
+
+
+@c -------------------------------------------------------------------------------------------------
+@c Detailed Breakdowns
+@c -------------------------------------------------------------------------------------------------
+@node Detailed Breakdowns
+@menu
+* Fetch Process::
+* Exception Entry::
+@end menu
+
+@node Fetch Process,,, Detailed Breakdowns
+Instruction Fetch Process:
+@enumerate
+  @item Processor issues instruction fetch.
+  @item Simultaeously does the following:
+  @itemize
+    @item Translates VA via TLB. If protection check fails, the fetch aborts.
+    @*@w{   }VAs use Secure or Non-secure TLBs depending on the processor state.
+    @item Looks up address in L1 cache.
+  @end itemize
+  @item Returns L1 hit, otherwise PA (addr after translation) is passed to L2 cache.
+  @item Returns L2 hit, otherwise issues AXI transaction to fetch from external memory.
+  @itemize @w{}
+    @item Non-secure access: If processor is in Non-secure mode or in secure mode and memory location has non-secure attribute.
+    @item Secure access: If processor is in secure state and memory location has secure attribute.
+  @end itemize
+@end enumerate
+
+Memory Access Sequence
+@enumerate
+  @item Issues TLB lookup based on requested VMA, ASID and security state.
+  TLB entry matches if all:
+  @itemize
+    @item Requested VA matches TLB assigned vA.
+    @item NSTID matches secure or non-secure state of request.
+    @item ASID matches current ASID or is global.
+  @end itemize
+  @item Performs TLB walk if lookup misses.
+@end enumerate
+
+@node Exception Entry,,, Detailed Breakdowns
+Exception Entry:
+@enumerate
+  @item Determines mode to take the exception in.
+  @item Save link value in releavent target mode register (usually LR but could be ELR if taken to a PL2 mode)
+    @*@w{  }Failures (undef. instr., prefetch and data aborts) link to the instruction that caused the exception.
+    @*@w{  }Non-failures (synchronous calls excepts., IRQ, FIQ and virtual exceptions) link to the next instruction after the exception-causing one.
+  @item CPSR is saved in target mode SPSR.
+  @item Set to secure state (SCR.NS = 0) if taking from secure monitor mode, otherwise leave SCR.NS unchanged.
+  @item Set exception CPSR @*
+    @itemize
+      @item .M       -> exception processor state
+      @item .(A|I|F) -> (optionally) corresponding exception mask to disable nested exceptions
+      @item .(T|J)   -> ISA state
+      @item .E       -> exception endianess
+      @item .IT      -> clear IT block
+    @end itemize
+  @item Set PC to corresponding exception vector
+@end enumerate
+
+@c -------------------------------------------------------------------------------------------------
+@c Register Layouts
+@c -------------------------------------------------------------------------------------------------
+@node Register Layouts
+@menu
+* CPSR::
+* SCTLR::
+@end menu
+
+@anchor{CPSR}
+************************** CPSR ****************************
+@indentedblock
+  @verbatim
+  CN  31           Negative condition 
+  CZ  30           Zero condition
+  CC  29           Carry condition
+  CV  28           Overflow condition
+  Q   27           Cumulative saturate Condition
+  IT  26:25,15:10  IT execution block state
+  J   24           Jazelle execution
+  GE  19:16        Greater-than or equal-to flags for SIMD instructions
+  E   9            Endianess
+  A   8            Asynchronous Abort Mask
+  I   7            IRQ mask
+  F   6            FIQ mask
+  T   5            Thumb execution
+  M   4:0          Processor mode
+@end verbatim
+@end indentedblock
+
+@*
+@anchor{SCTLR}
+@noindent************************** SCTLR ****************************
+@indentedblock
+  @verbatim
+               Reset
+             Input |
+             TLB | |
+           Sec | | |
+          RW | | |Depr
+  	 | | | | | |
+  TE   30        I 0
+  AFE  29      S   0
+  TRE  28      S   0        
+  NMFI 27 RO C   I 0        NMFI supp. (not Virt. ext.)
+  EE   25        I 0
+  VE   24          0 V      IMP DEF IRQ,FIQ Vecs. Supp.
+  FI   21    C     0        Fast Int. Supp.
+  UWXN 20          0
+  WXN  19          0
+  HA   17          0 L      Hw access flag manag.
+  RR   14 SL C     0        Cache replace. strat. Supp.
+  V    13        I 0
+  I    12          0        Instr. Cache Supp.
+  Z    11          0        Program flow pred. supp. or pred. config supp.
+  SW   10          0        SWP, SWPB supp.
+  BEN   5          1        Barrier ops supp.
+  C     2          0        Data or unified cache supp.
+  A     1          0
+  M     0          0
+  
+  SL - Sec locked; RO in non-secure mode
+@end verbatim
+@end indentedblock
+
+@node Notes,,,Top
+(NSTID?)
+PD0 or PD1 in TTB CR to enable TLB walks
+
+Note, care must be taken to ensure that only a single TLB matches at any one time.
+
+secure stage 1 MMU
+non-secure stage 1 MMU
+non-secure stage 2 MMU
+non-secure PL2 stage 1 MMU
+
+VA -+-------+--- Sec ---> S1_MMU -----------------------> PA
+    |       |    
+    |       +--- NSec --> S1_MMU --+-- Not PL2 ---------> PA
+    |                              |
+    +-- PL2 -----------------------+-- PL2 --> S2_MMU --> PA
+
+Cache Notes
+  Possible write buffer situated in between cache and main memory to allow the cache to still operate after a line has been evicted back to main memory; the write buffer
+    will overload the writes to main memory from the cache.
+
+Layer-by-layer attribute modification (constraining and expanding attrs perhaps?) in multi-staged MMU designs.
+L3 interconnect load monitoring
+
+Cache cleaning (write-back coherency by other observers) doesn't update memory if it was already updated by an observer outside the shareability domain of that cached address location?
+
+@bye
