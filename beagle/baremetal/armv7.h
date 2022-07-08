@@ -27,7 +27,7 @@
 #define SCTLR_WXN      0x00080000 /* Write perm. region implies PL1 execution */
 #define SCTLR_HA       0x00020000 /* Hardware management of access flag enable */
 #define SCTLR_RR       0x00004000 /* Round robin cache enable (as opposed to random) */
-#define SCTLR_V        0x00002000 /* Vectors select bit */
+#define SCTLR_V        0x00002000 /* Vectors select bit (high-vecs enable) */
 #define SCTLR_I        0x00001000 /* I-cache enable */
 #define SCTLR_Z        0x00000800 /* Branch prediction enable */
 #define SCTLR_SW       0x00000400 /* Swap instr. enable */
