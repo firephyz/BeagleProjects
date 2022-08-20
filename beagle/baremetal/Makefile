@@ -1,18 +1,22 @@
 MMC_SERIAL := 20090815198100000
 
-BEAGLE_ROOT := /home/kyle/dev/beagle
+BEAGLE_ROOT := /home/kyle/o/beagle/beagle
 ARCH_FLAGS := -mcpu=cortex-a8 -mfloat-abi=hard -marm
 CFLAGS := -isystem . -masm-syntax-unified -ffunction-sections -O2 -g
 
+IMAGE_MODE:=file #file (as FAT file), raw (as raw binary image on MMC)
+override LOAD_MEM:=$(LOAD_MEM:external=emif0_sdram)
+override LOAD_MEM:=$(if ifeq ($(LOAD_MEM),),sram,$(LOAD_MEM))
+$(info $(LOAD_MEM))
 # LOAD_MEM ?= sram
- LOAD_MEM ?= emif0_sdram
+# LOAD_MEM ?= emif0_sdram
 # LOAD_MEM ?= qemu_sram
 MEM_ADDRS := sram=0x402f0400 emif0_sdram=0x80000000 qemu_sram=0x42000000
 LOAD_ADDR := $(shell echo $(filter $(LOAD_MEM)%,$(MEM_ADDRS)) | sed -r 's/.*?=//')
 # LOAD_ADDR := $(if $(LOAD_MEM) eq sram,0x402f0400,$(if $(LOAD_MEM) eq 
 
-MKIMAGE := $(BEAGLE_ROOT)/beagle-gp-image.py
-#TI_IMAGE_RAW := -raw
+MKIMAGE := $(BEAGLE_ROOT)/items/scripts/beagle-gp-image.py
+override TI_IMAGE_RAW:=$(TI_IMAGE_RAW:y=-raw)
 
 OBJS := gpio_main.o asm.o 
 
@@ -54,8 +58,9 @@ qemu_targets: start.bin loop.bin
 
 .image: $(MKIMAGE) gpio.elf
 	arm-none-eabi-objcopy -O binary gpio.elf gpio.bin
+	echo $(TI_IMAGE_RAW)
 	$(MKIMAGE) gpio.bin $(LOAD_ADDR) $(TI_IMAGE_RAW)
-	touch .image
+	@touch .image
 
 load: .image
 	@SERIAL_COL=$$(($$(lsblk -l -p -O | head -n 1 | sed 's/SERIAL.*//' | wc | sed -r 's/([ ]+[^ ]+){2}[ ]+//') - 1))
@@ -73,10 +78,27 @@ load: .image
 	  echo MMC not found...;
 	  exit 1;
 	fi
-	dd if=u-boot.img of=$${MMC_DEV} bs=4096 status=progress
-	dd if=$${MMC_DEV} of=u-boot.img.readback bs=4096 count=$$((2**17 / 4096)) status=progress
-	if [[ $$(diff u-boot.img u-boot.img.readback) ]]; then \
-	  echo Writing image failed...; \
+	case $(IMAGE_MODE) in
+	  file )
+	    FAT_PARTITION=$${MMC_DEV}1
+	    MOUNT_PATH=$$((udisksctl mount -b $${FAT_PARTITION} || exit 1) | sed -r 's/Mounted [^ ]+ at //')
+	    cp -v u-boot.img $${MOUNT_PATH}/MLO
+	    cp $${MOUNT_PATH}/MLO u-boot.img.readback
+	    udisksctl unmount -b $${FAT_PARTITION} || exit 1
+	    ;;
+	  raw )
+	    dd if=u-boot.img of=$${MMC_DEV} bs=4096 status=progress
+	    dd if=$${MMC_DEV} of=u-boot.img.readback bs=4096 count=$$((2**17 / 4096)) status=progress
+	    ;;
+	  * )
+	    echo Invalid file mode $(FILE_MODE).
+	    exit 1
+	    ;;
+	esac
+	if [[ $$(diff u-boot.img u-boot.img.readback) ]]; then
+	  echo Writing image failed...;
+	else
+	  echo Write success.
 	fi
 	rm -f u-boot.img.readback
 

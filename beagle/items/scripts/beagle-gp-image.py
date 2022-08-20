@@ -4,8 +4,10 @@ import sys
 import os
 import math
 
+beagle_root = os.getcwd() + '/..'
+
 endians = {'little': -1, 'big': 1}
-endian = 'big'
+endian = 'little'
 
 def gen_toc_header():
     convert_endian = lambda y: bytes('', 'ascii').join(map(lambda x: x[::endians[endian]], y))
@@ -60,6 +62,7 @@ int2bytes = lambda n: bytes.fromhex('{{:0{}x}}'.format(math.ceil(math.log2(n)/32
 sizebytes = int2bytes(filesize)
 destbytes = int2bytes(dest)
 payloadbytes = binfile
+# open('{}/items/MLO.toc_header'.format(beagle_root), 'rb').read()
 imagebytes = sizebytes + destbytes + payloadbytes
 if config['raw_mode']:
     imagebytes = gen_toc_header() + imagebytes

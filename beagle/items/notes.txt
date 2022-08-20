@@ -1,7 +1,45 @@
+U-Boot Booting
+### allocate and then init gd data (and possible malloc space above that) ###
+  board_init_f_alloc_reserve
+  board_init_f_init_reserve (inits mem boardary related things I think)
+    - r9 holds top of SP, pointer to bottom of gd
+### with gd available, now setup early debug uart before everything else ###
+  debug_uart_init (if DEBUG_UART and SERIAL)
+  board_init_f
+### post-early-hardware-init/pre-relocate setup ###
+  setup new relocated environment (new gd and stack)
+  relocate_code (returns to label :here)
+### in relocated code now ###
+  relocate_vectors
+### finalize new environment ###
+  c_runtime_cpu_setup
+    - clears icache on beagle (post code relocation)
+  clear bss
+   > pre-board_init_r init led start functions
+### board_init_r ###
+  board_init_r (with gd * in r9, dest_addr in r1)
+U-Boot configuration
+  CONFIG_POSITION_INDEPENDENT - For pre-relocation PIE code
+  CONFIG_SYS_ARM_MMU          - I disabled the MMU to reduce complexity
+  CONFIG_ARCH_CPU_INIT        - <TODO look into the code; might be necessary>
+  CONFIG_SYS_ARCH_TIMER     * - Arm generic timer
+  SYS_THUMB_BUILD           * - Build Uboot as thumb code
+
+
+early_system_init
+  pin mux, clocks, debug, board detect
+SPL board_init_f
+  hw_data_init
+  early_system_init
+  board_early_init_f
+arch_cpu_init_dm (subset of board_init_f)
+  hw_data_init 
+  early_system_init (if not skipping lowlevel init)
+  
+
 Linux Configuration
   AM335x
     TI_PRUSS config parameter
-
   EFIVAR_FS
 
 new case, basic_machine-basic_os; each two fields

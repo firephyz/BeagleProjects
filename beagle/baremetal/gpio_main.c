@@ -86,18 +86,27 @@ void blink() {
   *(bank + 0x144/4) = 0x0;
   *(bank + 0x148/4) = 0x0;       // disable rising detect irq
   *(bank + 0x14C/4) = 0x0;       // disable falling detect irq
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
   *(bank + 0x194/4) = (1 << 21);
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
   delay(BLINK_DELAY);
   *(bank + 0x190/4) = (1 << 21);
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
   *(bank + 0x194/4) = (1 << 22);
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
   delay(BLINK_DELAY);
   *(bank + 0x190/4) = (1 << 22);
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
   *(bank + 0x194/4) = (1 << 23);
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
   delay(BLINK_DELAY);
   *(bank + 0x190/4) = (1 << 23);
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
   *(bank + 0x194/4) = (1 << 24);
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
   delay(BLINK_DELAY);
   *(bank + 0x190/4) = (1 << 24);
+  asm volatile("mcr p15, 0, r0, c7, c10, 4");
 }
 
 __attribute__((interrupt ("swi")))
@@ -116,10 +125,10 @@ void _start() {
   void disable_cache_and_mmu();
   void set_stack();
 
-  set_scr();
-  disable_interrupts();
-  disable_cache_and_mmu();
-  set_stack();
+/*   set_scr();
+ *   disable_interrupts();
+ *   disable_cache_and_mmu();
+ *   set_stack(); */
 /*   asm volatile ("svc 0");
  *   asm volatile ("udf"); */
   blink();
