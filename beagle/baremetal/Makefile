@@ -1,13 +1,14 @@
 MMC_SERIAL := 20090815198100000
 
-BEAGLE_ROOT := /home/kyle/o/beagle/beagle
-ARCH_FLAGS := -mcpu=cortex-a8 -mfloat-abi=hard -marm
+BEAGLE_ROOT := /home/kyle/dev/beagle
+ARCH_FLAGS := -mcpu=cortex-a8 -mfloat-abi=hard -mthumb
 CFLAGS := -isystem . -masm-syntax-unified -ffunction-sections -O2 -g
 
 IMAGE_MODE:=file #file (as FAT file), raw (as raw binary image on MMC)
-override LOAD_MEM:=$(LOAD_MEM:external=emif0_sdram)
-override LOAD_MEM:=$(if ifeq ($(LOAD_MEM),),sram,$(LOAD_MEM))
-$(info $(LOAD_MEM))
+#LOAD_MEM:=$(if ifeq ($(LOAD_MEM),external),emif0_sdram,)
+#LOAD_MEM=$(if ifeq ($(LOAD_MEM),),sram,$(LOAD_MEM))
+#override LOAD_MEM=emif0_sdram
+#$(info $(LOAD_MEM))
 # LOAD_MEM ?= sram
 # LOAD_MEM ?= emif0_sdram
 # LOAD_MEM ?= qemu_sram
@@ -16,7 +17,8 @@ LOAD_ADDR := $(shell echo $(filter $(LOAD_MEM)%,$(MEM_ADDRS)) | sed -r 's/.*?=//
 # LOAD_ADDR := $(if $(LOAD_MEM) eq sram,0x402f0400,$(if $(LOAD_MEM) eq 
 
 MKIMAGE := $(BEAGLE_ROOT)/items/scripts/beagle-gp-image.py
-override TI_IMAGE_RAW:=$(TI_IMAGE_RAW:y=-raw)
+# IMAGE_RAW ... y or n
+TI_IMAGE_RAW:=$(if $(filter $(IMAGE_RAW),y),-raw,)
 
 OBJS := gpio_main.o asm.o 
 
@@ -81,7 +83,7 @@ load: .image
 	case $(IMAGE_MODE) in
 	  file )
 	    FAT_PARTITION=$${MMC_DEV}1
-	    MOUNT_PATH=$$((udisksctl mount -b $${FAT_PARTITION} || exit 1) | sed -r 's/Mounted [^ ]+ at //')
+	    MOUNT_PATH=$$(udisksctl mount -b $${FAT_PARTITION} | sed -r 's/Mounted [^ ]+ at ([^.]+)\./\1/') || exti 1;
 	    cp -v u-boot.img $${MOUNT_PATH}/MLO
 	    cp $${MOUNT_PATH}/MLO u-boot.img.readback
 	    udisksctl unmount -b $${FAT_PARTITION} || exit 1

@@ -25,8 +25,8 @@ SECTIONS {
 
   .text : ALIGN(0x10) {
     *(.start)
-    *(.text.vectors)
-    *(.text.early_asm)
+/*     *(.text.vectors)
+ *     *(.text.early_asm) */
 /*     KEEP(*(.text.isr)) */
     *(.text)
     *(.text.*)

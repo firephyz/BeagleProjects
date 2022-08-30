@@ -120,10 +120,10 @@ void _interrupt_handler() {
 
 __attribute__((section (".start"), naked))
 void _start() {
-  void set_scr();
-  void disable_interrupts();
-  void disable_cache_and_mmu();
-  void set_stack();
+/*   void set_scr();
+ *   void disable_interrupts();
+ *   void disable_cache_and_mmu();
+ *   void set_stack(); */
 
 /*   set_scr();
  *   disable_interrupts();
@@ -131,6 +131,7 @@ void _start() {
  *   set_stack(); */
 /*   asm volatile ("svc 0");
  *   asm volatile ("udf"); */
+  *((uint32_t *)0x4804C000 + 0x194/4) = (1 << 21);
   blink();
   while (1) { asm volatile("wfe"); }
 }

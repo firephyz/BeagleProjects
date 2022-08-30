@@ -89,4 +89,4 @@ _user_vectors:
 	b _interrupt_handler  // hyp trap
 	b _interrupt_handler  // irq
 	b _interrupt_handler  // fiq
-	
+
