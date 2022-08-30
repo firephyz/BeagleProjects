@@ -1,0 +1,61 @@
+diff --git a/arch/arm/dts/am33xx-u-boot.dtsi b/arch/arm/dts/am33xx-u-boot.dtsi
+index 61d10b841b..4447c2b505 100644
+--- a/arch/arm/dts/am33xx-u-boot.dtsi
++++ b/arch/arm/dts/am33xx-u-boot.dtsi
+@@ -4,12 +4,30 @@
+  * https://www.br-automation.com/
+  */
+ 
++/*
++ * Local modification: Added u-boot,dm-pre-reloc properties to i2c0, baseboard_eeprom and uart0 so that we
++ * can rely entirely on the compiled DTB rather than statically declarated device nodes in <arch>/<board> or
++ * board/<board> directories (disabled the PLATDATA config I think it was).
++ */
++
+ / {
+ 	ocp {
+ 		u-boot,dm-pre-reloc;
++
++		i2c@44e0b000 {
++		     u-boot,dm-pre-reloc;
++
++		     baseboard_eeprom@50 {
++		         u-boot,dm-pre-reloc;
++		     };
++		};
+ 	};
+ };
+ 
++&uart0 {
++       u-boot,dm-pre-reloc;
++};
++
+ &prcm_clocks {
+ 	compatible = "simple-bus";
+ };
+diff --git a/arch/arm/mach-omap2/am33xx/board.c b/arch/arm/mach-omap2/am33xx/board.c
+index 7f1b84e466..d75d24ba18 100644
+--- a/arch/arm/mach-omap2/am33xx/board.c
++++ b/arch/arm/mach-omap2/am33xx/board.c
+@@ -269,13 +269,14 @@ int arch_misc_init(void)
+ 	if (ret || !dev)
+ 		return ret;
+ 
+-#if defined(CONFIG_DM_ETH) && defined(CONFIG_USB_ETHER)
+-	ret = usb_ether_init();
+-	if (ret) {
+-		pr_err("USB ether init failed\n");
+-		return ret;
+-	}
+-#endif
++// LOCAL_CHANGE: Commented out because I don't want to add much USB support to SPL
++/* #if defined(CONFIG_DM_ETH) && defined(CONFIG_USB_ETHER)
++ * 	ret = usb_ether_init();
++ * 	if (ret) {
++ * 		pr_err("USB ether init failed\n");
++ * 		return ret;
++ * 	}
++ * #endif */
+ 
+ 	return 0;
+ }

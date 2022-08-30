@@ -173,16 +173,20 @@ Mode Quirks
 @node Barrier Operations,,, Usage
 @noindent
 @itemize
-  @item ISB (Instr. Sync. Barrier) - Synchronizes processor context in preparation for the next instruction (finishes all instrs. before ISB and flushes old context).
-    ensures completion of context ops before continuing
-  @item DSB (Data   Sync. Barrier) - Ensures the completion of all memory accesses (and cache/TLB/branch maintenance ops) before the next instruction.
-    ensures ordering & completion of data ops before continuing but it doesn't recreate processor context
-  @item DMB (Data  Memory Barrier) - Ensures that
-    ensures correct memory ordering of accesses ???
+  @item ISB (Instr. Sync. Barrier)
+@*    Synchronizes processor context in preparation for the next instruction (finishes all instrs. before ISB and flushes old context).
+@*    Ensures completion of context ops before continuing
+  @item DSB (Data   Sync. Barrier)
+@*    Ensures the completion of all memory accesses (and cache/TLB/branch maintenance ops) before the next instruction.
+@*    Ensures ordering & completion of data ops before continuing but it doesn't recreate processor context
+  @item DMB (Data  Memory Barrier)
+@*    Ensures that ensures correct memory ordering of accesses ???
+@end itemize
 
 all accesses by the domain that 'are observed' before DSB
 all loads that occur before observers (of those loads) performs a group A access.
   - I think should only apply to prefetching loads 'after' the Pe's DMB ('after' because how does one define relevent ('after') prefetching loads of processors that aren't the Pe).
+  
 
 
 @c -------------------------------------------------------------------------------------------------

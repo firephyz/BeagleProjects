@@ -1,0 +1,3 @@
+autoload=n
+bootcmd=dhcp; tftp ${fileaddr} uboot; setexpr fileaddr ${fileaddr} + ${filesize}; tftp ${fileaddr} uboot.env
+

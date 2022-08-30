@@ -114,6 +114,7 @@ AM335X
       0x20000 - 0x2C000 (48KB)
     0x402F_0000 - 0x4030_0000 (64KB) SRAM internal
       0x000 - 0x400 (1KB) reserved
+      0x1CE00 - 0x20000 (
     0x4030_0000 - 0x4031_0000 (64KB) L3 OCMC0
     0x8000_0000 - 0xC000_0000 (1GB) EMIF0 SDRAM (external memory interface)
 

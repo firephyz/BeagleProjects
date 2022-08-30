@@ -1,0 +1,49 @@
+reset
+  disable interrupts and set processor mode
+  setup vector
+  jump to _main
+
+_main
+> (C) arch_very_early_init
+  setup stack
+  call board_init_f_alloc_reserve
+  call board_init_f_init_reserve
+  call debug_uart_init
+> (SPL) call CLEAR_BSS
+  call board_init_f (if SPL, beagle uses arch specific one)
+> (not SPL) rest...
+  setup new sp and gd
+  call relocate_code
+  call relocate_vectors
+  call c_runtime_cpu_setup
+  call CLEAR_BSS
+  turn on power-on LEDs
+  call board_init_r
+  
+board_init_f
+  setup_mon_len     - sets gd->mon_len
+  fdtdec_setup      - sets FDT related fields in the gd
+  initf_malloc      - setup malloc related gd fields
+  log_init 
+  initf_bootstage   - maintain bootstage
+  event_init        - init event list gd fields
+  setup_spl_handoff - setup SPL bloblist handoff if enabled
+  arch_cpu_init     - ... board not supplied?
+  mach_cpu_init     - ... board not supplied?
+  initf_dm          - init and scan dm
+  timer_init        - init timer
+ env_init,
+ init_baud_rate,
+ serial_init,
+ console_init_f,
+ display_options,
+ display_text_info,
+ checkcpu,
+ print_cpuinfo,
+ show_board_info,
+ misc_init_f,
+
+early_system_init
+  debug_uart_init
+> (SPL) spl_early_init
+  do_board_detect

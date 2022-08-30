@@ -1,0 +1,163 @@
+COMMENT: test local changes.
+DATE: Tue Aug 30 00:27:52 2022 -0400
+
+diff --git a/board/ti/am335x/board.c b/board/ti/am335x/board.c
+index 0db845ac25..2cb5b1cb3f 100644
+--- a/board/ti/am335x/board.c
++++ b/board/ti/am335x/board.c
+@@ -79,10 +79,8 @@ static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
+ #ifdef CONFIG_TI_I2C_BOARD_DETECT
+ void do_board_detect(void)
+ {
+-	printf("setting i2c pinmux...\n");
+ 	enable_i2c0_pin_mux();
+ 	enable_i2c2_pin_mux();
+-	printf("reading eeprom...\n");
+ 	if (ti_i2c_eeprom_am_get(CONFIG_EEPROM_BUS_ADDRESS,
+ 				 CONFIG_EEPROM_CHIP_ADDRESS))
+ 		printf("ti_i2c_eeprom_init failed\n");
+@@ -540,17 +538,13 @@ void sdram_init(void)
+ 		 * EVM SK 1.2A and later use gpio0_7 to enable DDR3.
+ 		 * This is safe enough to do on older revs.
+ 		 */
+-	  printf("Fail\n");
+-	  hang();
+-/* 		gpio_request(GPIO_DDR_VTT_EN, "ddr_vtt_en");
+- * 		gpio_direction_output(GPIO_DDR_VTT_EN, 1); */
++		gpio_request(GPIO_DDR_VTT_EN, "ddr_vtt_en");
++		gpio_direction_output(GPIO_DDR_VTT_EN, 1);
+ 	}
+ 
+ 	if (board_is_icev2()) {
+-	  printf("Fail\n");
+-	  hang();
+-/* 		gpio_request(ICE_GPIO_DDR_VTT_EN, "ddr_vtt_en");
+- * 		gpio_direction_output(ICE_GPIO_DDR_VTT_EN, 1); */
++		gpio_request(ICE_GPIO_DDR_VTT_EN, "ddr_vtt_en");
++		gpio_direction_output(ICE_GPIO_DDR_VTT_EN, 1);
+ 	}
+ 
+ 	if (board_is_evm_sk())
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index a702f9b09f..1121b99abf 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -7,9 +7,6 @@
+  *
+  * Based loosely off of Linux's PHY Lib
+  */
+-
+-#define DEBUG
+-
+ #include <common.h>
+ #include <console.h>
+ #include <dm.h>
+diff --git a/drivers/net/ti/cpsw.c b/drivers/net/ti/cpsw.c
+index 8164065c53..8988c21e66 100644
+--- a/drivers/net/ti/cpsw.c
++++ b/drivers/net/ti/cpsw.c
+@@ -1279,14 +1279,14 @@ static int cpsw_eth_of_to_plat(struct udevice *dev)
+ 		return ret;
+ 	}
+ 
+-/* 	num_mode_gpios = gpio_get_list_count(dev, "mode-gpios");
+- * 	if (num_mode_gpios > 0) {
+- * 		mode_gpios = malloc(sizeof(struct gpio_desc) *
+- * 				    num_mode_gpios);
+- * 		gpio_request_list_by_name(dev, "mode-gpios", mode_gpios,
+- * 					  num_mode_gpios, GPIOD_IS_OUT);
+- * 		free(mode_gpios);
+- * 	} */
++	num_mode_gpios = gpio_get_list_count(dev, "mode-gpios");
++	if (num_mode_gpios > 0) {
++		mode_gpios = malloc(sizeof(struct gpio_desc) *
++				    num_mode_gpios);
++		gpio_request_list_by_name(dev, "mode-gpios", mode_gpios,
++					  num_mode_gpios, GPIOD_IS_OUT);
++		free(mode_gpios);
++	}
+ 
+ 	data->active_slave = dev_read_u32_default(dev, "active_slave", 0);
+ 
+
+COMMENT: Made beagle's SPL more FDT friendly so we don't have to use the static device defines through <arch> and <board>.
+DATE: Mon Aug 29 10:13:25 2022 -0400
+
+diff --git a/arch/arm/dts/am33xx-u-boot.dtsi b/arch/arm/dts/am33xx-u-boot.dtsi
+index 4447c2b505..61d10b841b 100644
+--- a/arch/arm/dts/am33xx-u-boot.dtsi
++++ b/arch/arm/dts/am33xx-u-boot.dtsi
+@@ -4,30 +4,12 @@
+  * https://www.br-automation.com/
+  */
+ 
+-/*
+- * Local modification: Added u-boot,dm-pre-reloc properties to i2c0, baseboard_eeprom and uart0 so that we
+- * can rely entirely on the compiled DTB rather than statically declarated device nodes in <arch>/<board> or
+- * board/<board> directories (disabled the PLATDATA config I think it was).
+- */
+-
+ / {
+ 	ocp {
+ 		u-boot,dm-pre-reloc;
+-
+-		i2c@44e0b000 {
+-		     u-boot,dm-pre-reloc;
+-
+-		     baseboard_eeprom@50 {
+-		         u-boot,dm-pre-reloc;
+-		     };
+-		};
+ 	};
+ };
+ 
+-&uart0 {
+-       u-boot,dm-pre-reloc;
+-};
+-
+ &prcm_clocks {
+ 	compatible = "simple-bus";
+ };
+diff --git a/arch/arm/mach-omap2/am33xx/board.c b/arch/arm/mach-omap2/am33xx/board.c
+index d75d24ba18..7f1b84e466 100644
+--- a/arch/arm/mach-omap2/am33xx/board.c
++++ b/arch/arm/mach-omap2/am33xx/board.c
+@@ -269,14 +269,13 @@ int arch_misc_init(void)
+ 	if (ret || !dev)
+ 		return ret;
+ 
+-// LOCAL_CHANGE: Commented out because I don't want to add much USB support to SPL
+-/* #if defined(CONFIG_DM_ETH) && defined(CONFIG_USB_ETHER)
+- * 	ret = usb_ether_init();
+- * 	if (ret) {
+- * 		pr_err("USB ether init failed\n");
+- * 		return ret;
+- * 	}
+- * #endif */
++#if defined(CONFIG_DM_ETH) && defined(CONFIG_USB_ETHER)
++	ret = usb_ether_init();
++	if (ret) {
++		pr_err("USB ether init failed\n");
++		return ret;
++	}
++#endif
+ 
+ 	return 0;
+ }
+
+COMMENT: Removed CONFIG_EXTRA_ENV_SETTINGS define for beagle bone.
+DATE: Mon Aug 29 10:12:56 2022 -0400
+
+diff --git a/include/configs/am335x_evm.h b/include/configs/am335x_evm.h
+index 180c6ab297..fd5b209a52 100644
+--- a/include/configs/am335x_evm.h
++++ b/include/configs/am335x_evm.h
+@@ -159,7 +159,6 @@
+ 	NETARGS \
+ 	DFUARGS \
+ 	BOOTENV
+-#undef CONFIG_EXTRA_ENV_SETTINGS
+ #endif
+ 
+ /* NS16550 Configuration */
+

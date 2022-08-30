@@ -1,0 +1,12 @@
+diff --git a/include/configs/am335x_evm.h b/include/configs/am335x_evm.h
+index fd5b209a52..180c6ab297 100644
+--- a/include/configs/am335x_evm.h
++++ b/include/configs/am335x_evm.h
+@@ -159,6 +159,7 @@
+ 	NETARGS \
+ 	DFUARGS \
+ 	BOOTENV
++#undef CONFIG_EXTRA_ENV_SETTINGS
+ #endif
+ 
+ /* NS16550 Configuration */

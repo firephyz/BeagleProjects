@@ -1,4 +1,4 @@
-This is arm-core-notes.info, produced by makeinfo version 6.7 from
+This is arm-core-notes.info, produced by texi2any version 6.7 from
 arm-core-notes.texi.
 
 \input textinfo
@@ -12,12 +12,13 @@ ARM Core Functionality Notes
 * Menu:
 
 * Design and Model::
+* Usage::
 * Detailed Breakdowns::
 * Register Layouts::
 * Notes::
 
 
-File: arm-core-notes.info,  Node: Design and Model,  Next: Detailed Breakdowns,  Prev: Top,  Up: Top
+File: arm-core-notes.info,  Node: Design and Model,  Next: Usage,  Prev: Top,  Up: Top
 
 * Menu:
 
@@ -89,22 +90,59 @@ Kinds of Exceptions:
 Exception Return:
      Return Instructions:
        * RFE <base_reg>                                ; load PC and CPSR (in that order) from address in base_reg ; PC & CPSR from memory
-       * SUBS pc, lr, [<imm> adjust]                   ; (or if zero adjust, use MOV)                              ; PC from instr, CPSR from SPSR
-       * LDM(I|D)(A|B) <base_reg> {<reg_list_with_pc>} ; lowest reg at lowest address                              ; PC & CPSR from memory
+       * SUBS pc, lr, [<imm> adjust]                   ; (or if zero adjust, use MOVS)                             ; PC from instr, CPSR from SPSR
+       * LDM(I|D)(A|B) <base_reg> {<reg_list_with_pc>} ; lowest reg at lowest address                              ; PC (and others) from memory, CPSR from SPSR
      PC alignment implied by hardware
+
+Exception Vector Offsets
+                            Exception Offset Mapping By Mode
+            +--------------+---------------+-------------+---------------+
+            |  Hypervisor  |   Monitor     |   Secure    |  Non-Secure   |
+	    +--------------+---------------+-------------+---------------+
+        0x00|              |               |    Reset    |               |
+	0x04|              |               | Undef Instr |  Undef Instr  |
+	0x08|  Hyp. Call   | Sec. Mon. Cal |  Svr Call   |   Svr Call    |
+	0x0C|----------------------- Prefetch Abort ---------------------|
+	0x10|------------------------- Data Abort -----------------------|
+	0x14| Hyp.Trap/Ent |                                             |
+	0x18|---------------------------- IRQ ---------------------------|
+	0x1C|---------------------------- FIQ ---------------------------|
+            +____________________________________________________________+
 
 Exception Masking
      CPSR.(A|I|F) bits enable masking of asynch., IRQ and FIQ exceptions respectively.
        - what are synch.  and asynch.  aborts?
      SCR.(AW|FW) bits:
        Non-virt-cpu: Locks non-secure writing of the CPSR.(A|I|F) bits.
-           virt-cpu: CPSR mask bypass disable when routing asynch.  or FIQ except.  (AW,FW respectively) to secure mode
-     (SCR.EA = 1).
-             - When 0 (bypass enabled), CPSR.(A|I|F) releavent flags are still masked in secure mode but exceptions
-     coming from non-secure code are routed to secure monitor mode.
+           virt-cpu: CPSR mask bypass disable when routing asynch.  or FIQ except.  (AW,FW respectively) to secure mode (SCR.EA = 1).
+             - When 0 (bypass enabled), CPSR.(A|I|F) releavent flags are still masked in secure mode but exceptions coming from non-secure code are
+     routed to secure monitor mode.
 
 
-File: arm-core-notes.info,  Node: Detailed Breakdowns,  Next: Register Layouts,  Prev: Design and Model,  Up: Top
+File: arm-core-notes.info,  Node: Usage,  Next: Detailed Breakdowns,  Prev: Design and Model,  Up: Top
+
+* Menu:
+
+* Barrier Operations::
+
+
+File: arm-core-notes.info,  Node: Barrier Operations,  Up: Usage
+
+   * ISB (Instr.  Sync.  Barrier)
+     Synchronizes processor context in preparation for the next instruction (finishes all instrs.  before ISB and flushes old context).
+     Ensures completion of context ops before continuing
+   * DSB (Data Sync.  Barrier)
+     Ensures the completion of all memory accesses (and cache/TLB/branch maintenance ops) before the next instruction.
+     Ensures ordering & completion of data ops before continuing but it doesn't recreate processor context
+   * DMB (Data Memory Barrier)
+     Ensures that ensures correct memory ordering of accesses ???
+
+   all accesses by the domain that 'are observed' before DSB all loads that occur before observers (of those loads) performs a group A access.  - I
+think should only apply to prefetching loads 'after' the Pe's DMB ('after' because how does one define relevent ('after') prefetching loads of
+processors that aren't the Pe).
+
+
+File: arm-core-notes.info,  Node: Detailed Breakdowns,  Next: Register Layouts,  Prev: Usage,  Up: Top
 
 * Menu:
 
@@ -122,11 +160,10 @@ Instruction Fetch Process:
         * Looks up address in L1 cache.
   3. Returns L1 hit, otherwise PA (addr after translation) is passed to L2 cache.
   4. Returns L2 hit, otherwise issues AXI transaction to fetch from external memory.
-          Non-secure access: If processor is in Non-secure mode or in secure mode and memory location has non-secure
-          attribute.
+          Non-secure access: If processor is in Non-secure mode or in secure mode and memory location has non-secure attribute.
           Secure access: If processor is in secure state and memory location has secure attribute.
 
-  Memory Access Sequence
+   Memory Access Sequence
   1. Issues TLB lookup based on requested VMA, ASID and security state.  TLB entry matches if all:
         * Requested VA matches TLB assigned vA.
         * NSTID matches secure or non-secure state of request.
@@ -140,8 +177,7 @@ Exception Entry:
   1. Determines mode to take the exception in.
   2. Save link value in releavent target mode register (usually LR but could be ELR if taken to a PL2 mode)
        Failures (undef.  instr., prefetch and data aborts) link to the instruction that caused the exception.
-       Non-failures (synchronous calls excepts., IRQ, FIQ and virtual exceptions) link to the next instruction after the
-     exception-causing one.
+       Non-failures (synchronous calls excepts., IRQ, FIQ and virtual exceptions) link to the next instruction after the exception-causing one.
   3. CPSR is saved in target mode SPSR.
   4. Set to secure state (SCR.NS = 0) if taking from secure monitor mode, otherwise leave SCR.NS unchanged.
   5. Set exception CPSR
@@ -211,40 +247,41 @@ File: arm-core-notes.info,  Node: Notes,  Up: Top
 
 (NSTID?) PD0 or PD1 in TTB CR to enable TLB walks
 
-  Note, care must be taken to ensure that only a single TLB matches at any one time.
+   Note, care must be taken to ensure that only a single TLB matches at any one time.
 
-  secure stage 1 MMU non-secure stage 1 MMU non-secure stage 2 MMU non-secure PL2 stage 1 MMU
+   secure stage 1 MMU non-secure stage 1 MMU non-secure stage 2 MMU non-secure PL2 stage 1 MMU
 
-  VA -+-----+-- Sec --> S1_MMU ---------------> PA | | | +-- NSec -> S1_MMU -+- Not PL2 ------> PA | | +- PL2
----------------+- PL2 -> S2_MMU -> PA
+   VA -+-----+-- Sec --> S1_MMU ---------------> PA | | | +-- NSec -> S1_MMU -+- Not PL2 ------> PA | | +- PL2 ---------------+- PL2 -> S2_MMU -> PA
 
-  Cache Notes Possible write buffer situated in between cache and main memory to allow the cache to still operate after
-a line has been evicted back to main memory; the write buffer will overload the writes to main memory from the cache.
+   Cache Notes Possible write buffer situated in between cache and main memory to allow the cache to still operate after a line has been evicted back
+to main memory; the write buffer will overload the writes to main memory from the cache.
 
-  Layer-by-layer attribute modification (constraining and expanding attrs perhaps?)  in multi-staged MMU designs.  L3
-interconnect load monitoring
+   Layer-by-layer attribute modification (constraining and expanding attrs perhaps?)  in multi-staged MMU designs.  L3 interconnect load monitoring
 
-  Cache cleaning (write-back coherency by other observers) doesn't update memory if it was already updated by an
-observer outside the shareability domain of that cached address location?
+   Cache cleaning (write-back coherency by other observers) doesn't update memory if it was already updated by an observer outside the shareability
+domain of that cached address location?
 
 
 
 Tag Table:
 Node: Top106
-Node: Design and Model329
-Node: Modes493
-Ref: Mode quirks1746
-Node: Exceptions and Their Configurations1985
-Ref: Kinds of Exceptions2194
-Ref: Exception Return3010
-Ref: Exception Masking3518
-Node: Detailed Breakdowns4089
-Node: Fetch Process4254
-Node: Exception Entry5369
-Node: Register Layouts6331
-Ref: CPSR6466
-Ref: SCTLR7144
-Node: Notes8236
+Node: Design and Model339
+Node: Modes489
+Ref: Mode quirks1742
+Node: Exceptions and Their Configurations1981
+Ref: Kinds of Exceptions2190
+Ref: Exception Return3006
+Ref: Exception Vector Offsets3536
+Ref: Exception Masking4467
+Node: Usage5033
+Node: Barrier Operations5172
+Node: Detailed Breakdowns6146
+Node: Fetch Process6300
+Node: Exception Entry7406
+Node: Register Layouts8363
+Ref: CPSR8498
+Ref: SCTLR9176
+Node: Notes10268
 
 End Tag Table
 

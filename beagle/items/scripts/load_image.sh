@@ -1,29 +1,117 @@
-#set -x
+#!/bin/bash
 
-#python -c "import sys; uboot=open('u-boot.img','rb').read(); header=open('../MLO.header', 'rb').read(); uboot_size=uboot[0:4]; img=header[:512] + int.from_bytes(uboot_size, 'little').to_bytes(4, 'big') + 0x80000000.to_bytes(4,'little') + uboot[4:]; sys.stdout.buffer.write(img)" > u-boot.bin
-PYTHON_CMD=$(cat <<EOF
-import sys;
-import os;
-beagle_root = os.path.dirname(os.getcwd());
-uboot=open('u-boot.img','rb').read();
-toc_header=open('{}/items/MLO.toc_header'.format(beagle_root), 'rb').read();
-uboot_size_bytes = int.from_bytes(uboot[0:4], 'little').to_bytes(4, 'big');
-uboot_addr_bytes = int.from_bytes(uboot[4:8], 'little').to_bytes(4, 'big');
-img=uboot_size_bytes + uboot_addr_bytes + uboot[8:];
-sys.stdout.buffer.write(img)
-EOF
-)
-PYTHON_CMD=$(echo "${PYTHON_CMD}" | xargs -d '\n' -L 1 printf "%s")
-python -c "${PYTHON_CMD}" > u-boot.bin
+source ~/.bashrc
 
-MOUNT_PATH=$((udisksctl mount -b /dev/sda1 || exit 1) | sed -r 's/Mounted [^ ]+ at //')
-#mount /dev/sda1 /mnt/block/2
-cp u-boot.bin ${MOUNT_PATH}/MLO
-cp ${MOUNT_PATH}/MLO u-boot.bin.readback
-if [[ $(diff u-boot.bin{,.readback}) ]]; then
-    echo Image readback failed... && READ_VAL=$?
+shopt -s expand_aliases
+set -e
+
+function usage {
+    printf "<script> [-nobackup] [-noupdate] [-keep-mount] [--help]\n"
+}
+
+UBOOT_PATH=/mnt/harddisk/beagle/u-boot
+TFTP_ROOT=/mnt/harddisk/beagle/tftpboot
+IMAGE_MOUNT=/run/media/kyle/UBOOT
+BACKUP_PATH=$IMAGE_MOUNT/old/$(pdate)
+
+# IMAGE_FILES="MLO u-boot.img uboot.env"
+IMAGE_FILES="MLO u-boot.img uboot.env"
+function image_files_with_path {
+    echo $(eval echo $1/{$(echo $IMAGE_FILES | sed 's/ /,/g')})
+}
+
+function mkenv {
+    ${UBOOT_PATH}/kbuild/tools/mkenvimage -s 4096 -o ${UBOOT_PATH}/kbuild/uboot.env ${UBOOT_PATH}/kbuild/default_env.txt
+}
+
+############################################################
+# Parse Options
+f_backup=y
+f_update_image=y
+f_force_update=
+f_unmount=y
+f_mode=mmc
+
+skip=0
+arg_target=
+for flag in $@; do
+    # Skip previously consumed atoms
+    if [[ ${skip} > 0 ]]; then
+        eval "${arg_target}=$flag"
+	skip= && continue
+    fi
+
+    case $flag in
+	--* )
+	    case $flag in
+		--help ) usage && exit 0;;
+		* ) echo Unknown long flag $flag. && exit 1;;
+	    esac
+	    ;;
+	-* )
+	    case $flag in
+		-mode )
+		    arg_target=f_mode
+		    skip=1
+		    ;;
+		-nobackup ) f_backup=;;
+		-noupdate ) f_update_image=;;
+		-force ) f_force_update=y;;
+		-keep-mount ) f_unmount=;;
+		* ) echo Unknown flag $flag. && exit 1;;
+	    esac
+	    ;;
+	* ) echo Invalid flag form for $flag. && exit 1;;
+    esac
+done
+
+if [[ ! $f_backup && $f_update_image && ! $f_force_update ]]; then
+    echo Warning: old images would be overwritten with the update. Run without '-nobackup' or add '-force'. && exit 1;
 fi
-udisksctl unmount -b /dev/sda1
 
-[ ${READ_VAL} ] && exit 1
-#umount /mnt/block/2
+################################################################################
+# Core functions
+
+function load_mmc {
+    test -d $IMAGE_MOUNT || (echo Couldn\'t find $IMAGE_MOUNT. Exiting... && exit 1)
+
+    # Make sure we have env file
+    mkenv
+    # if [ -f ${UBOOT_PATH}/kbuild/u-boot-initial-env ]; then
+    #     cp -v ${UBOOT_PATH}/kbuild/u-boot-initial-env ${UBOOT_PATH}/kbuild/uboot.env;
+    # else
+    #     echo Env file \'default.env\' not found in build directory. && exit 1
+    # fi
+
+    if [[ $f_backup ]]; then
+	mkdir -v $BACKUP_PATH
+	for f in $(image_files_with_path $(readlink -f ${IMAGE_MOUNT})); do
+	    test -f $f && mv -v $f $BACKUP_PATH/
+	done
+    fi
+
+    if [[ $f_update_image || $f_force_update ]]; then
+	cp -v $(image_files_with_path ${UBOOT_PATH}/kbuild) $IMAGE_MOUNT/
+    fi
+
+    # Print sizes
+    echo Image Sizes
+    du -ha --apparent-size ${IMAGE_MOUNT}/ | grep -vE "UBOOT/(old|\$)" | sort | xargs -d '\n' -l printf "    %s\n"
+
+    if [[ $f_unmount ]]; then
+	sync -f $IMAGE_MOUNT
+	udisksctl unmount -b $(lsblk -p | grep $IMAGE_MOUNT | sed -r s'/..([^ ]+).*/\1/')
+    fi
+}
+
+function load_tftp {
+    cp -v $(image_files_with_path ${UBOOT_PATH}/kbuild) $TFTP_ROOT/
+}
+
+################################################
+## Start
+case $f_mode in
+    tftp ) load_tftp;;
+    mmc )  load_mmc;;
+    * ) echo Unknown script mode $f_mode. && exit 1;;
+esac
