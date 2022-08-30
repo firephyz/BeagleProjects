@@ -9,6 +9,8 @@ beagle_root = os.getcwd() + '/..'
 endians = {'little': -1, 'big': 1}
 endian = 'little'
 
+image_out_size=0x10000
+
 def gen_toc_header():
     convert_endian = lambda y: bytes('', 'ascii').join(map(lambda x: x[::endians[endian]], y))
     toc_struct_1 = [bytes.fromhex('00000040'),
@@ -66,7 +68,7 @@ payloadbytes = binfile
 imagebytes = sizebytes + destbytes + payloadbytes
 if config['raw_mode']:
     imagebytes = gen_toc_header() + imagebytes
-padding = bytes(0x20000-len(imagebytes))
+padding = bytes(image_out_size-len(imagebytes))
 
 outfile = open(outfilename, 'wb+')
 outfile.write(imagebytes + padding)
