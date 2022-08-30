@@ -1,1 +1,8 @@
 images/
+
+beagle/items/known-builds/*/binaries/*
+beagle/items/uboot-image-backups/*
+!beagle/items/uboot-image-backups/.touch
+
+beagle/tftpboot/*
+!beagle/tftpboot/test
